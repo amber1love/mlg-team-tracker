@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLG Team Tracker</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161922;
+    --surface2: #1e2230;
+    --surface3: #252a3a;
+    --border: #2c3148;
+    --border-light: #3a4060;
+    --text: #e8eaf2;
+    --text-muted: #7a809e;
+    --text-dim: #4a5070;
+    --accent: #4f8ef7;
+    --accent-glow: rgba(79,142,247,0.15);
+    --green: #2dd98f;
+    --green-bg: rgba(45,217,143,0.1);
+    --yellow: #f5c842;
+    --yellow-bg: rgba(245,200,66,0.1);
+    --red: #f55e5e;
+    --red-bg: rgba(245,94,94,0.1);
+    --purple: #a78bfa;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px; min-height: 100vh; }
+
+  /* TOP BAR */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex; align-items: center; gap: 16px;
+    height: 52px; position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-logo { font-family: var(--sans); font-weight: 800; font-size: 15px; color: var(--accent); letter-spacing: -0.5px; white-space: nowrap; }
+  .topbar-logo span { color: var(--text-muted); font-weight: 400; font-size: 12px; margin-left: 8px; }
+  .nav-tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+  .nav-tab {
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 11px;
+    color: var(--text-muted); font-family: var(--mono); white-space: nowrap;
+    transition: all 0.15s; border: 1px solid transparent;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--surface2); }
+  .nav-tab.active { color: var(--accent); background: var(--accent-glow); border-color: rgba(79,142,247,0.3); }
+  .save-btn {
+    background: var(--accent); color: #fff; border: none; padding: 6px 14px;
+    border-radius: 6px; cursor: pointer; font-family: var(--mono); font-size: 11px;
+    font-weight: 500; transition: opacity 0.15s; white-space: nowrap;
+  }
+  .save-btn:hover { opacity: 0.85; }
+  .save-indicator { font-size: 10px; color: var(--green); white-space: nowrap; }
+
+  /* PANELS */
+  .panel { display: none; padding: 20px; animation: fadeIn 0.2s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* SECTION HEADERS */
+  .section-header {
+    font-family: var(--sans); font-size: 18px; font-weight: 700;
+    color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-sub { color: var(--text-muted); font-size: 11px; margin-bottom: 20px; }
+
+  /* KPI CARDS */
+  .kpi-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; flex: 1; min-width: 130px;
+  }
+  .kpi-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .kpi-value { font-family: var(--sans); font-size: 24px; font-weight: 700; color: var(--text); }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.yellow { color: var(--yellow); }
+  .kpi-value.red { color: var(--red); }
+  .kpi-value.accent { color: var(--accent); }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; min-width: 900px; }
+  thead th {
+    background: var(--surface2); padding: 9px 10px; text-align: left;
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.07em; border-bottom: 1px solid var(--border);
+    white-space: nowrap; font-family: var(--mono);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 8px 10px; vertical-align: middle; }
+  td input, td select, td textarea {
+    background: transparent; border: none; color: var(--text);
+    font-family: var(--mono); font-size: 12px; width: 100%;
+    outline: none; padding: 2px 4px; border-radius: 4px;
+  }
+  td input:focus, td select:focus, td textarea:focus {
+    background: var(--surface3); outline: 1px solid var(--accent);
+  }
+  td select option { background: var(--surface2); color: var(--text); }
+  td textarea { resize: none; min-width: 120px; }
+
+  /* STATUS BADGES */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 500; white-space: nowrap;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green); border: 1px solid rgba(45,217,143,0.25); }
+  .badge-yellow { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(245,200,66,0.25); }
+  .badge-red { background: var(--red-bg); color: var(--red); border: 1px solid rgba(245,94,94,0.25); }
+
+  /* ROW STATUS COLORING */
+  tr.row-active td:first-child { border-left: 3px solid var(--green); }
+  tr.row-stalled td:first-child { border-left: 3px solid var(--yellow); }
+  tr.row-notlive td:first-child { border-left: 3px solid var(--red); }
+
+  /* ADD ROW BTN */
+  .add-row-btn {
+    background: var(--surface2); border: 1px dashed var(--border-light);
+    color: var(--text-muted); padding: 8px 16px; border-radius: 8px;
+    cursor: pointer; font-family: var(--mono); font-size: 11px;
+    transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 8px;
+  }
+  .add-row-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+  /* FORECAST TABS */
+  .qtabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .qtab {
+    padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 12px;
+    border: 1px solid var(--border); color: var(--text-muted); transition: all 0.15s;
+  }
+  .qtab.active { background: var(--accent-glow); border-color: rgba(79,142,247,0.35); color: var(--accent); }
+
+  /* MEDDPICC SCORE BAR */
+  .score-bar-wrap { width: 80px; }
+  .score-bar-track { background: var(--surface3); border-radius: 4px; height: 6px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; background: var(--accent); }
+  .score-pct { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* WEEKLY SUMMARY KPIs */
+  .week-kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 800px) { .week-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  /* INSTRUCTIONS */
+  .instr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 700px) { .instr-grid { grid-template-columns: 1fr; } }
+  .instr-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .instr-card h3 { font-family: var(--sans); font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--accent); }
+  .instr-card p, .instr-card li { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .instr-card ul { padding-left: 16px; }
+  .meddpicc-table { width: 100%; border-collapse: collapse; }
+  .meddpicc-table td { padding: 7px 10px; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .meddpicc-table td:first-child { color: var(--accent); font-weight: 600; width: 20px; font-family: var(--sans); font-size: 16px; }
+  .meddpicc-table td:nth-child(2) { color: var(--text); font-weight: 600; width: 140px; }
+  .meddpicc-table td:nth-child(3) { color: var(--text-muted); }
+
+  /* FORECAST MONTH COLS */
+  .month-val { color: var(--accent); font-weight: 500; }
+  .wtd-val { color: var(--purple); }
+
+  /* PROGRESSION */
+  .prog-select { background: transparent; border: none; color: var(--text); font-family: var(--mono); font-size: 13px; cursor: pointer; }
+
+  /* MANAGER ACTIONS */
+  .priority-high { color: var(--red); font-weight: 600; }
+  .priority-med { color: var(--yellow); }
+  .priority-low { color: var(--text-muted); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+  .delete-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s; }
+  .delete-btn:hover { color: var(--red); }
+
+  .week-of-input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--mono); font-size: 12px; padding: 5px 10px; border-radius: 6px; outline: none;
+  }
+  .week-of-input:focus { border-color: var(--accent); }
+
+  .forecast-year-input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--accent);
+    font-family: var(--mono); font-size: 12px; padding: 4px 8px; border-radius: 6px; outline: none; width: 70px;
+  }
+  .section-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+    font-family: var(--mono); font-size: 11px; padding: 5px 10px; border-radius: 6px; outline: none;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+  .search-input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: 6px; outline: none; width: 180px;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  .export-btn {
+    background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border-light);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: var(--mono);
+    font-size: 11px; font-weight: 500; transition: all 0.15s; white-space: nowrap;
+  }
+  .export-btn:hover { border-color: var(--green); color: var(--green); }
+
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">MLG TEAM TRACKER <span>v3.3</span></div>
+  <div class="nav-tabs" id="navTabs">
+    <div class="nav-tab active" onclick="showPanel('instructions')">📋 Instructions</div>
+    <div class="nav-tab" onclick="showPanel('dealtracker')">🎯 Deal Tracker</div>
+    <div class="nav-tab" onclick="showPanel('forecast')">📊 Quarterly Forecast</div>
+    <div class="nav-tab" onclick="showPanel('weeklynotes')">📝 Weekly Notes</div>
+    <div class="nav-tab" onclick="showPanel('weeklysummary')">📈 Weekly Summary</div>
+    <div class="nav-tab" onclick="showPanel('meddpicc')">🏆 MEDDPICC Deep Dive</div>
+    <div class="nav-tab" onclick="showPanel('sellercredit')">💰 MLG Seller Credit</div>
+  </div>
+  <div class="save-indicator" id="saveIndicator"></div>
+  <div id="syncStatus" style="display:flex;align-items:center;gap:8px;font-size:11px;white-space:nowrap">
+    <span id="syncDot" style="width:8px;height:8px;border-radius:50%;background:var(--text-dim);display:inline-block"></span>
+    <span id="syncLabel" style="color:var(--text-muted)">Connecting...</span>
+  </div>
+  <button class="save-btn" onclick="forceSave()" title="Force save now">💾 Save</button>
+</div>
+
+<!-- ===== INSTRUCTIONS ===== -->
+<div class="panel active" id="panel-instructions">
+  <div class="section-header">📋 How To Use This Forecasting Workbook</div>
+  <div class="section-sub">A complete guide to sheets, auto-routing, status triggers, and MEDDPICC methodology.</div>
+
+  <div class="instr-grid">
+    <div class="instr-card">
+      <h3>Sheet Overview</h3>
+      <ul>
+        <li><strong style="color:var(--text)">Deal Tracker</strong> — Master pipeline. Add every deal here. Status dropdown triggers color-coding (🟢 Active, 🟡 Stalled, 🔴 Not Live). Weighted Value = ACV × Probability.</li>
+        <li><strong style="color:var(--text)">Q1/Q2/Q3 Forecast</strong> — Calculated from Deal Tracker based on Close Date. Deals flow into the correct month column automatically.</li>
+        <li><strong style="color:var(--text)">Weekly Notes</strong> — Tracks all active deals. Add weekly notes, progression, blockers, and action items.</li>
+        <li><strong style="color:var(--text)">Weekly Summary</strong> — KPI dashboard: active deals, progressed, stalled, pipeline total. Update each Monday.</li>
+        <li><strong style="color:var(--text)">MEDDPICC Deep Dive</strong> — Enterprise qualification table. Completeness score auto-calculates (% of 9 fields filled).</li>
+      </ul>
+    </div>
+    <div class="instr-card">
+      <h3>How Auto-Routing Works</h3>
+      <ul>
+        <li><strong style="color:var(--text)">Quarter Routing</strong> — Close Date month determines quarter: Jan–Mar → Q1, Apr–Jun → Q2, Jul–Sep → Q3, Oct–Dec → Q4.</li>
+        <li><strong style="color:var(--text)">Monthly Routing</strong> — Within each quarterly view, deal ACV appears in the correct month column based on Close Date.</li>
+        <li><strong style="color:var(--text)">Weekly Notes Flow</strong> — Weekly Notes pulls Deal Name, Account, Owner, and Status from Deal Tracker automatically.</li>
+      </ul>
+      <h3 style="margin-top:12px">Status Triggers</h3>
+      <ul>
+        <li><span class="badge badge-green">🟢 Active</span> — Engaged within 14 days, stakeholders active, next steps agreed.</li>
+        <li><span class="badge badge-yellow">🟡 Stalled</span> — No meaningful activity in 14+ days. Champion gone quiet.</li>
+        <li><span class="badge badge-red">🔴 Not Live</span> — Deal lost, on-hold indefinitely, or contact completely dark.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section-header" style="font-size:15px; margin-bottom:12px">MEDDPICC Field Guide</div>
+  <div class="instr-card" style="max-width:800px">
+    <table class="meddpicc-table">
+      <tr><td>M</td><td>Metrics</td><td>Quantify ROI: cost savings, revenue gain, time saved. What does the customer measure success by?</td></tr>
+      <tr><td>E</td><td>Economic Buyer</td><td>Who controls budget authority? Have you had a direct conversation with them?</td></tr>
+      <tr><td>D</td><td>Decision Criteria</td><td>What must your solution do to win? Are you fully mapped to all requirements?</td></tr>
+      <tr><td>D</td><td>Decision Process</td><td>Who is involved? What steps happen before signature?</td></tr>
+      <tr><td>D</td><td>Decision Date</td><td>Hard deadline? Tied to fiscal year end, board meeting, or business event?</td></tr>
+      <tr><td>P</td><td>Paper Process</td><td>Who handles legal? MSA template? Procurement process? Security review?</td></tr>
+      <tr><td>I</td><td>Identify Pain</td><td>What is the compelling event? Cost of inaction? Why now?</td></tr>
+      <tr><td>C</td><td>Champion</td><td>Who is selling for you internally? Do they have influence and access to power?</td></tr>
+      <tr><td>C</td><td>Competition</td><td>Who else is being evaluated? What is your differentiation and win strategy?</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ===== DEAL TRACKER ===== -->
+<div class="panel" id="panel-dealtracker">
+  <div class="section-header">🎯 Collaborative Sales Forecasting Tracker</div>
+  <div class="section-sub">30 / 60 / 90 Day Pipeline — Master deal list. All other views derive from this data.</div>
+
+  <div id="dealKPIs" class="kpi-row"></div>
+
+  <div class="section-toolbar">
+    <input class="search-input" id="dealSearch" placeholder="🔍 Search deals..." oninput="renderDeals()">
+    <select class="filter-select" id="dealStatusFilter" onchange="renderDeals()">
+      <option value="">All Statuses</option>
+      <option value="Active">🟢 Active</option>
+      <option value="Stalled">🟡 Stalled</option>
+      <option value="Not Live">🔴 Not Live</option>
+    </select>
+    <select class="filter-select" id="dealMLGFilter" onchange="renderDeals()">
+      <option value="">All MLG Reps</option>
+    </select>
+    <select class="filter-select" id="dealOwnerFilter" onchange="renderDeals()">
+      <option value="">All Owners</option>
+    </select>
+    <select class="filter-select" id="dealMonthFilter" onchange="renderDeals()">
+      <option value="">All Close Months</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table id="dealTable">
+      <thead>
+        <tr>
+          <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th>
+          <th>Close Month</th><th>Forecast Bucket</th><th>Prob %</th><th>Net ACV ($)</th><th>MLG Seller Credit ($)</th>
+          <th>Wtd Value ($)</th><th>Champion</th><th>Last Activity</th><th>Next Step</th><th>Notes</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="dealTbody"></tbody>
+    </table>
+  </div>
+  <button class="add-row-btn" onclick="addDeal()">＋ Add Deal</button>
+</div>
+
+<!-- ===== FORECAST ===== -->
+<div class="panel" id="panel-forecast">
+  <div class="section-header">📊 Quarterly Forecast</div>
+  <div class="section-sub">Auto-populated from Deal Tracker by Close Date. Switch quarters below.</div>
+
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+    <div class="qtabs">
+      <div class="qtab active" onclick="showQuarter('Q1', this)">Q1 (Jan–Mar)</div>
+      <div class="qtab" onclick="showQuarter('Q2', this)">Q2 (Apr–Jun)</div>
+      <div class="qtab" onclick="showQuarter('Q3', this)">Q3 (Jul–Sep)</div>
+      <div class="qtab" onclick="showQuarter('Q4', this)">Q4 (Oct–Dec)</div>
+    </div>
+    <div style="font-size:11px; color:var(--text-muted)">Forecast Year:</div>
+    <input class="forecast-year-input" id="forecastYear" type="number" value="2026" min="2020" max="2035" onchange="renderForecast()">
+  </div>
+
+  <div id="forecastKPIs" class="kpi-row"></div>
+  <div class="table-wrap">
+    <table id="forecastTable">
+      <thead id="forecastHead"></thead>
+      <tbody id="forecastTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== WEEKLY NOTES ===== -->
+<div class="panel" id="panel-weeklynotes">
+  <div class="section-header">📝 Weekly Coaching Notes & Deal Progression</div>
+  <div class="section-sub">Deal info auto-pulls from Deal Tracker. Enter weekly notes, progression, blockers, and action items in the columns below.</div>
+
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+    <div style="font-size:11px; color:var(--text-muted)">📅 Week Of:</div>
+    <input class="week-of-input" id="weekOfDate" type="date" onchange="saveAll()">
+  </div>
+
+  <div class="table-wrap">
+    <table id="weeklyNotesTable">
+      <thead>
+        <tr>
+          <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th>
+          <th>Progression ↑↓→</th><th>Weekly Notes</th><th>Blockers / Risks</th>
+          <th>Action Items</th><th>Action Owner</th><th>Due Date</th>
+          <th>Forecast Impact ($)</th><th>Manager Comments</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">M – Metrics</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">E – Econ. Buyer</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">D – Dec. Criteria</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">D – Dec. Process</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">D – Dec. Date</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">P – Paper Process</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">I – Identify Pain</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">C – Champion</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">C – Competition</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">Biggest Gap</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">Rec. Action</th>
+          <th style="background:rgba(79,142,247,0.15);color:var(--accent)">MEDDPICC Score</th>
+        </tr>
+      </thead>
+      <tbody id="weeklyNotesTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== WEEKLY SUMMARY ===== -->
+<div class="panel" id="panel-weeklysummary">
+  <div class="section-header">📈 Weekly Deal Progression Summary Dashboard</div>
+  <div class="section-sub">Update "Week Of" date each Monday. Populate top deals and action items below.</div>
+
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+    <div style="font-size:11px; color:var(--text-muted)">📅 Week Of:</div>
+    <input class="week-of-input" id="summaryWeekOf" type="date" onchange="saveAll()">
+  </div>
+
+  <div class="week-kpi-grid" id="summaryKPIs"></div>
+
+  <div class="section-header" style="font-size:14px; margin-bottom:12px">🚀 Top Progressed Deals This Week</div>
+  <div class="section-sub">Manually updated each Monday.</div>
+  <div class="table-wrap">
+    <table id="topDealsTable">
+      <thead>
+        <tr><th>Deal Name</th><th>Account</th><th>Owner</th><th>Status</th><th>Progression</th><th>Key Notes / Update</th><th>Action Item</th><th>Due</th><th>Closed?</th><th>Notes</th><th></th></tr>
+      </thead>
+      <tbody id="topDealsTbody"></tbody>
+    </table>
+  </div>
+  <button class="add-row-btn" onclick="addTopDeal()">＋ Add Deal</button>
+
+  <div class="section-header" style="font-size:14px; margin-top:24px; margin-bottom:12px">💡 Manager Action Items</div>
+  <div class="table-wrap">
+    <table id="managerActionsTable">
+      <thead>
+        <tr><th>Priority</th><th>Action Item</th><th>Deal / Account</th><th>Owner</th><th>Due Date</th><th>Status</th><th>Notes</th><th></th></tr>
+      </thead>
+      <tbody id="managerActionsTbody"></tbody>
+    </table>
+  </div>
+  <button class="add-row-btn" onclick="addManagerAction()">＋ Add Action</button>
+</div>
+
+<!-- ===== MEDDPICC ===== -->
+<div class="panel" id="panel-meddpicc">
+  <div class="section-header">🏆 MEDDPICC Enterprise Qualification Deep Dive</div>
+  <div class="section-sub">Complete one row per deal. Score auto-calculates (% of 9 MEDDPICC fields completed). Deal Name & Account pull from Deal Tracker.</div>
+
+  <div class="table-wrap">
+    <table id="meddpiccTable">
+      <thead>
+        <tr>
+          <th>Deal Name</th><th>Account</th><th>Owner</th><th>Score</th>
+          <th>M – Metrics</th><th>E – Econ. Buyer</th><th>D – Dec. Criteria</th>
+          <th>D – Dec. Process</th><th>D – Dec. Date</th><th>P – Paper Process</th>
+          <th>I – Identify Pain</th><th>C – Champion</th><th>C – Competition</th>
+          <th>Exec Sponsor?</th><th>Multi-Threaded?</th><th>Security Risk?</th>
+          <th>Impl. Plan?</th><th>Biggest Gap</th><th>Rec. Action</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="meddpiccTbody"></tbody>
+    </table>
+  </div>
+  <button class="add-row-btn" onclick="addMeddpicc()">＋ Add Deal</button>
+</div>
+
+<script>
+// ===== DATA STORE =====
+const STAGES = ['Stage 0- Unique Meeting Set','Stage 1- Unique Meeting Run','Stage 2- Analysis','Stage 3- Executive Alignment','Stage 4- Solution Validation','Stage 5- Negotiate','Stage 6- Finance Hold','Stage 7- Finance Review','Closed Won','Closed Lost'];
+const STATUSES = ['Active','Stalled','Not Live'];
+const FORECAST_BUCKETS = ['Commit','Best Case','Pipeline','Upside'];
+const PROG_OPTIONS = ['↑ Progressed','→ Flat','↓ Regressed','✅ Closed Won','❌ Closed Lost'];
+const MLG_REPS = ['Adam Kloskey','James Laux','Luke Manning','Audra Borger','Michael Asmondy','Amber Johnson'];
+
+let data = {
+  deals: [],
+  weeklyNotes: {},
+  weeklyNotesWeekOf: '',
+  summaryWeekOf: '',
+  topDeals: [],
+  managerActions: [],
+  meddpicc: [],
+  forecastYear: 2026
+};
+
+let currentQuarter = 'Q1';
+
+// ===== FIREBASE SETUP =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCImIECuYRT_uBdA47oY9c1KDu7afZM4Sk",
+  authDomain: "mlg-team-tracker.firebaseapp.com",
+  projectId: "mlg-team-tracker",
+  storageBucket: "mlg-team-tracker.firebasestorage.app",
+  messagingSenderId: "1069654561056",
+  appId: "1:1069654561056:web:99b01e043e520c7452c745"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DOC_REF = db.collection('tracker').doc('team');
+
+let isSaving = false;
+let pendingSave = false;
+let unsubscribe = null;
+
+function setSyncStatus(state) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  if (!dot || !label) return;
+  const states = {
+    connecting: { color: 'var(--yellow)', text: 'Connecting...' },
+    live:       { color: 'var(--green)',  text: '🟢 Live — all changes sync instantly' },
+    saving:     { color: 'var(--accent)', text: '⟳ Saving...' },
+    error:      { color: 'var(--red)',    text: '⚠ Connection error — check internet' },
+    offline:    { color: 'var(--yellow)', text: '⚡ Offline — changes saved locally' },
+  };
+  const s = states[state] || states.connecting;
+  dot.style.background = s.color;
+  label.textContent = s.text;
+}
+
+function loadData() {
+  // Kept for compatibility — actual load is done via Firebase listener
+  if (!data.deals) data.deals = [];
+  if (!data.weeklyNotes) data.weeklyNotes = {};
+  if (!data.topDeals) data.topDeals = [];
+  if (!data.managerActions) data.managerActions = [];
+  if (!data.meddpicc) data.meddpicc = [];
+  if (!data.forecastYear) data.forecastYear = 2026;
+}
+
+function collectActive() {
+  const activePanel = document.querySelector('.panel.active')?.id || '';
+  if (activePanel === 'panel-dealtracker') collectDealData();
+  collectWeeklyNotesData();
+  if (activePanel === 'panel-weeklysummary') { collectTopDeals(); collectManagerActions(); }
+  if (activePanel === 'panel-meddpicc') collectMeddpicc();
+  data.weeklyNotesWeekOf = document.getElementById('weekOfDate')?.value || '';
+  data.summaryWeekOf = document.getElementById('summaryWeekOf')?.value || '';
+  data.forecastYear = parseInt(document.getElementById('forecastYear')?.value) || 2026;
+}
+
+function saveAll() {
+  collectActive();
+  // Also keep localStorage as offline fallback
+  localStorage.setItem('mlgTeamTracker_v1', JSON.stringify(data));
+  if (isSaving) { pendingSave = true; return; }
+  isSaving = true;
+  setSyncStatus('saving');
+  DOC_REF.set(data)
+    .then(() => {
+      isSaving = false;
+      setSyncStatus('live');
+      if (pendingSave) { pendingSave = false; saveAll(); }
+    })
+    .catch(err => {
+      isSaving = false;
+      setSyncStatus('error');
+      console.error('Firebase save error:', err);
+    });
+}
+
+function forceSave() {
+  collectActive();
+  localStorage.setItem('mlgTeamTracker_v1', JSON.stringify(data));
+  setSyncStatus('saving');
+  DOC_REF.set(data)
+    .then(() => setSyncStatus('live'))
+    .catch(() => setSyncStatus('error'));
+}
+
+// ===== UTILITIES =====
+function fmt$(n) { if (!n || isNaN(n)) return '—'; return '$' + Number(n).toLocaleString(); }
+function inp(val, cls='') { return `<input type="text" value="${escHtml(val||'')}" class="${cls}" onchange="schedSave()">`; }
+function inpNum(val, cls='') { return `<input type="number" value="${val||''}" class="${cls}" style="width:70px" onchange="schedSave()">`; }
+function inpDate(val) { return `<input type="date" value="${val||''}" onchange="schedSave()">`; }
+function inpMonth(val) { return `<input type="month" value="${val||''}" style="width:130px" onchange="schedSave()">`; }
+function fmtCloseMonth(v) {
+  const MNAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const m = v && v.match(/^(\d{4})-(\d{2})$/);
+  if (m) return MNAMES[parseInt(m[2])] + ' ' + m[1];
+  return v || '—';
+}
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let saveTimer;
+let isEditing = false;
+let editingTimer = null;
+function setEditing() {
+  isEditing = true;
+  clearTimeout(editingTimer);
+  editingTimer = setTimeout(() => { isEditing = false; }, 3000);
+}
+function schedSave() { setEditing(); clearTimeout(saveTimer); saveTimer = setTimeout(saveAll, 800); }
+
+function statusBadge(s) {
+  if (s === 'Active') return `<span class="badge badge-green">🟢 Active</span>`;
+  if (s === 'Stalled') return `<span class="badge badge-yellow">🟡 Stalled</span>`;
+  if (s === 'Not Live') return `<span class="badge badge-red">🔴 Not Live</span>`;
+  return `<span class="badge">${escHtml(s)}</span>`;
+}
+
+function statusRowClass(s) {
+  if (s==='Active') return 'row-active';
+  if (s==='Stalled') return 'row-stalled';
+  if (s==='Not Live') return 'row-notlive';
+  return '';
+}
+
+function selOpts(arr, val) {
+  return arr.map(o => `<option value="${escHtml(o)}" ${val===o?'selected':''}>${escHtml(o)}</option>`).join('');
+}
+
+function getMonthFromDate(dateStr) {
+  if (!dateStr) return null;
+  // Handle YYYY-MM format (month picker)
+  const m = dateStr.match(/^(\d{4})-(\d{2})$/);
+  if (m) return parseInt(m[2]);
+  const d = new Date(dateStr + 'T12:00:00');
+  return isNaN(d) ? null : d.getMonth() + 1;
+}
+function getYearFromDate(dateStr) {
+  if (!dateStr) return null;
+  // Handle YYYY-MM format (month picker)
+  const m = dateStr.match(/^(\d{4})-(\d{2})$/);
+  if (m) return parseInt(m[1]);
+  const d = new Date(dateStr + 'T12:00:00');
+  return isNaN(d) ? null : d.getFullYear();
+}
+
+// ===== PANEL NAVIGATION =====
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'dealtracker') renderDeals();
+  if (name === 'forecast') renderForecast();
+  if (name === 'weeklynotes') renderWeeklyNotes();
+  if (name === 'weeklysummary') renderWeeklySummary();
+  if (name === 'meddpicc') renderMeddpicc();
+  if (name === 'sellercredit') renderSellerCredit();
+}
+
+// ===== DEAL TRACKER =====
+function addDeal() {
+  setEditing();
+  data.deals.push({
+    id: Date.now(), name:'', account:'', owner:'', mlgRep:'', status:'Active',
+    stage:'Stage 0- Unique Meeting Set', closeDate:'', forecastBucket:'Pipeline',
+    prob:0, acv:0, sellerCredit:0, champion:'', lastActivity:'', nextStep:'', notes:''
+  });
+  renderDeals(); schedSave();
+}
+
+function deleteDeal(id) {
+  data.deals = data.deals.filter(d => d.id !== id);
+  renderDeals(); schedSave();
+}
+
+function collectDealData() {
+  const tbody = document.getElementById('dealTbody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr[data-id]');
+  rows.forEach(row => {
+    const id = parseInt(row.dataset.id);
+    const deal = data.deals.find(d => d.id === id);
+    if (!deal) return;
+    const inputs = row.querySelectorAll('input, select, textarea');
+    deal.name = inputs[0]?.value || '';
+    deal.account = inputs[1]?.value || '';
+    deal.owner = inputs[2]?.value || '';
+    deal.mlgRep = inputs[3]?.value || '';
+    deal.status = inputs[4]?.value || 'Active';
+    deal.stage = inputs[5]?.value || '';
+    deal.closeDate = inputs[6]?.value || '';
+    deal.forecastBucket = inputs[7]?.value || '';
+    deal.prob = parseFloat(inputs[8]?.value) || 0;
+    deal.acv = parseFloat(inputs[9]?.value) || 0;
+    deal.sellerCredit = parseFloat(inputs[10]?.value) || 0;
+    // inputs[11] is Wtd Value (display only, no input) — skip
+    deal.champion = inputs[11]?.value || '';
+    deal.lastActivity = inputs[12]?.value || '';
+    deal.nextStep = inputs[13]?.value || '';
+    deal.notes = inputs[14]?.value || '';
+  });
+}
+
+function renderDeals() {
+  collectDealData();
+  const search = (document.getElementById('dealSearch')?.value || '').toLowerCase();
+  const statusF = document.getElementById('dealStatusFilter')?.value || '';
+  const ownerF = document.getElementById('dealOwnerFilter')?.value || '';
+  const mlgF = document.getElementById('dealMLGFilter')?.value || '';
+  const monthF = document.getElementById('dealMonthFilter')?.value || '';
+
+  // Populate MLG filter
+  const mlgSel = document.getElementById('dealMLGFilter');
+  if (mlgSel) {
+    const cur = mlgSel.value;
+    mlgSel.innerHTML = '<option value="">All MLG Reps</option>' + MLG_REPS.map(r => `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join('');
+  }
+  // Populate owner filter
+  const owners = [...new Set(data.deals.map(d => d.owner).filter(Boolean))];
+  const ownerSel = document.getElementById('dealOwnerFilter');
+  if (ownerSel) {
+    const cur = ownerSel.value;
+    ownerSel.innerHTML = '<option value="">All Owners</option>' + owners.map(o => `<option value="${escHtml(o)}" ${o===cur?'selected':''}>${escHtml(o)}</option>`).join('');
+  }
+  // Populate close month filter dynamically
+  const monthSel = document.getElementById('dealMonthFilter');
+  if (monthSel) {
+    const cur = monthSel.value;
+    const months = [...new Set(data.deals.map(d => d.closeDate).filter(Boolean))].sort();
+    monthSel.innerHTML = '<option value="">All Close Months</option>' + months.map(m => {
+      const label = fmtCloseMonth(m);
+      return `<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(label)}</option>`;
+    }).join('');
+  }
+
+  let filtered = data.deals.filter(d => {
+    if (statusF && d.status !== statusF) return false;
+    if (ownerF && d.owner !== ownerF) return false;
+    if (mlgF && d.mlgRep !== mlgF) return false;
+    if (monthF && d.closeDate !== monthF) return false;
+    if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  // KPIs — always calculated from FILTERED set so month filter affects them
+  const active = filtered.filter(d => d.status === 'Active').length;
+  const stalled = filtered.filter(d => d.status === 'Stalled').length;
+  const notlive = filtered.filter(d => d.status === 'Not Live').length;
+  const closedWon = filtered.filter(d => d.stage === 'Closed Won').reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
+  const pipeline = filtered.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
+  const wtd = filtered.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').reduce((s, d) => s + (parseFloat(d.acv)||0) * (parseFloat(d.prob)||0) / 100, 0);
+  const filterLabel = monthF ? ` — ${fmtCloseMonth(monthF)}` : '';
+  document.getElementById('dealKPIs').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Active Deals${filterLabel}</div><div class="kpi-value green">${active}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Stalled${filterLabel}</div><div class="kpi-value yellow">${stalled}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Not Live</div><div class="kpi-value red">${notlive}</div></div>
+    <div class="kpi-card" style="border-color: rgba(45,217,143,0.4); background: linear-gradient(135deg, var(--surface) 0%, rgba(45,217,143,0.07) 100%);">
+      <div class="kpi-label" style="color:var(--green)">🏆 Closed Won${filterLabel}</div>
+      <div class="kpi-value green">${fmt$(closedWon)}</div>
+    </div>
+    <div class="kpi-card"><div class="kpi-label">Pipeline${filterLabel}</div><div class="kpi-value accent">${fmt$(pipeline)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Weighted Pipeline${filterLabel}</div><div class="kpi-value">${fmt$(wtd)}</div></div>
+    <div class="kpi-card" style="border-color:rgba(167,139,250,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(167,139,250,0.07) 100%)">
+      <div class="kpi-label" style="color:var(--purple)">💰 Seller Credit${filterLabel}</div>
+      <div class="kpi-value" style="color:var(--purple)">${fmt$(filtered.reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0))}</div>
+    </div>
+  `;
+
+  const tbody = document.getElementById('dealTbody');
+  tbody.innerHTML = filtered.map(d => {
+    const wtdVal = (parseFloat(d.acv)||0) * (parseFloat(d.prob)||0) / 100;
+    return `<tr data-id="${d.id}" class="${statusRowClass(d.status)}">
+      <td>${inp(d.name)}</td>
+      <td>${inp(d.account)}</td>
+      <td>${inp(d.owner)}</td>
+      <td><select onchange="schedSave()">${selOpts(MLG_REPS, d.mlgRep)}</select></td>
+      <td><select onchange="schedSave(); renderDeals()">${selOpts(STATUSES, d.status)}</select></td>
+      <td><select onchange="schedSave()">${selOpts(STAGES, d.stage)}</select></td>
+      <td>${inpMonth(d.closeDate)}</td>
+      <td><select onchange="schedSave()">${selOpts(FORECAST_BUCKETS, d.forecastBucket)}</select></td>
+      <td><input type="number" value="${d.prob||''}" min="0" max="100" style="width:55px" onchange="schedSave()">%</td>
+      <td><input type="number" value="${d.acv||''}" style="width:90px" onchange="schedSave()"></td>
+      <td><input type="number" value="${d.sellerCredit||''}" style="width:90px" onchange="schedSave()" placeholder="0"></td>
+      <td style="color:var(--purple)">${fmt$(wtdVal)}</td>
+      <td>${inp(d.champion)}</td>
+      <td>${inpDate(d.lastActivity)}</td>
+      <td><textarea rows="1" onchange="schedSave()">${escHtml(d.nextStep)}</textarea></td>
+      <td><textarea rows="1" onchange="schedSave()">${escHtml(d.notes)}</textarea></td>
+      <td><button class="delete-btn" onclick="deleteDeal(${d.id})" title="Delete">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== FORECAST =====
+function showQuarter(q, el) {
+  currentQuarter = q;
+  document.querySelectorAll('.qtab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderForecast();
+}
+
+const Q_MONTHS = {
+  Q1: ['January','February','March'], Q2: ['April','May','June'],
+  Q3: ['July','August','September'], Q4: ['October','November','December']
+};
+const MONTH_NUMS = {January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12};
+
+function renderForecast() {
+  const year = parseInt(document.getElementById('forecastYear')?.value) || 2026;
+  const months = Q_MONTHS[currentQuarter];
+  const [m1, m2, m3] = months.map(m => MONTH_NUMS[m]);
+
+  const deals = data.deals.filter(d => {
+    const y = getYearFromDate(d.closeDate);
+    const mo = getMonthFromDate(d.closeDate);
+    return y === year && [m1, m2, m3].includes(mo);
+  });
+
+  const head = document.getElementById('forecastHead');
+  head.innerHTML = `<tr>
+    <th>Deal Name</th><th>Account</th><th>Owner</th><th>Status</th><th>Stage</th>
+    <th>Close Date</th><th>Prob %</th><th>Net ACV ($)</th>
+    <th class="month-val">${months[0]} ($)</th><th class="month-val">${months[1]} ($)</th><th class="month-val">${months[2]} ($)</th>
+    <th>${currentQuarter} Total ($)</th><th class="wtd-val">Wtd Value ($)</th>
+    <th>Champion</th><th>Next Step</th><th>Notes</th>
+  </tr>`;
+
+  let totals = {m1:0, m2:0, m3:0, total:0, wtd:0};
+  const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtCloseDate(v) {
+    const m = v && v.match(/^(\d{4})-(\d{2})$/);
+    if (m) return MONTH_NAMES[parseInt(m[2])] + ' ' + m[1];
+    return v || '—';
+  }
+  const tbody = document.getElementById('forecastTbody');
+  tbody.innerHTML = deals.map(d => {
+    const mo = getMonthFromDate(d.closeDate);
+    const acv = parseFloat(d.acv) || 0;
+    const v1 = mo === m1 ? acv : 0, v2 = mo === m2 ? acv : 0, v3 = mo === m3 ? acv : 0;
+    const qtot = acv;
+    const wtd = acv * (parseFloat(d.prob)||0) / 100;
+    totals.m1 += v1; totals.m2 += v2; totals.m3 += v3; totals.total += qtot; totals.wtd += wtd;
+    return `<tr class="${statusRowClass(d.status)}">
+      <td>${escHtml(d.name)}</td><td>${escHtml(d.account)}</td><td>${escHtml(d.owner)}</td>
+      <td>${statusBadge(d.status)}</td><td style="font-size:11px;color:var(--text-muted)">${escHtml(d.stage)}</td>
+      <td>${fmtCloseDate(d.closeDate)}</td><td>${d.prob||0}%</td><td>${fmt$(acv)}</td>
+      <td class="month-val">${v1 ? fmt$(v1) : '—'}</td>
+      <td class="month-val">${v2 ? fmt$(v2) : '—'}</td>
+      <td class="month-val">${v3 ? fmt$(v3) : '—'}</td>
+      <td>${fmt$(qtot)}</td><td class="wtd-val">${fmt$(wtd)}</td>
+      <td>${escHtml(d.champion)}</td><td>${escHtml(d.nextStep)}</td><td>${escHtml(d.notes)}</td>
+    </tr>`;
+  }).join('') + `<tr style="background:var(--surface2); font-weight:600; border-top:2px solid var(--border-light)">
+    <td colspan="8" style="color:var(--text-muted); font-size:11px; text-transform:uppercase">Totals</td>
+    <td class="month-val">${fmt$(totals.m1)}</td><td class="month-val">${fmt$(totals.m2)}</td><td class="month-val">${fmt$(totals.m3)}</td>
+    <td>${fmt$(totals.total)}</td><td class="wtd-val">${fmt$(totals.wtd)}</td>
+    <td colspan="3"></td>
+  </tr>`;
+
+  document.getElementById('forecastKPIs').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">${currentQuarter} Deals</div><div class="kpi-value accent">${deals.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">${months[0]}</div><div class="kpi-value">${fmt$(totals.m1)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">${months[1]}</div><div class="kpi-value">${fmt$(totals.m2)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">${months[2]}</div><div class="kpi-value">${fmt$(totals.m3)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">${currentQuarter} Total</div><div class="kpi-value green">${fmt$(totals.total)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Wtd Pipeline</div><div class="kpi-value" style="color:var(--purple)">${fmt$(totals.wtd)}</div></div>
+  `;
+}
+
+// ===== WEEKLY NOTES =====
+function collectWeeklyNotesData() {
+  const tbody = document.getElementById('weeklyNotesTbody');
+  if (!tbody) return;
+  // Only collect if the weekly notes panel is active — otherwise DOM is empty
+  if (!document.getElementById('panel-weeklynotes')?.classList.contains('active')) return;
+  tbody.querySelectorAll('tr[data-id]').forEach(row => {
+    const id = row.dataset.id;
+    if (!data.weeklyNotes[id]) data.weeklyNotes[id] = {};
+    const n = data.weeklyNotes[id];
+    // Use named data-field attributes to avoid index fragility
+    row.querySelectorAll('[data-field]').forEach(el => {
+      n[el.dataset.field] = el.value || '';
+    });
+  });
+}
+
+function renderWeeklyNotes() {
+  const weekOf = document.getElementById('weekOfDate');
+  if (weekOf && data.weeklyNotesWeekOf) weekOf.value = data.weeklyNotesWeekOf;
+
+  const tbody = document.getElementById('weeklyNotesTbody');
+  const activeDeals = data.deals.filter(d => d.status !== 'Not Live');
+  tbody.innerHTML = activeDeals.map(d => {
+    const n = data.weeklyNotes[d.id] || {};
+    // Find MEDDPICC row for this deal
+    const mRow = data.meddpicc.find(m => m.dealId === d.id || (m.name === d.name && d.name)) || {};
+    const mScore = calcMeddpiccScore(mRow);
+    const mColor = mScore >= 70 ? 'var(--green)' : mScore >= 40 ? 'var(--yellow)' : 'var(--red)';
+    const mBg = 'background:rgba(79,142,247,0.05)';
+    return `<tr data-id="${d.id}" class="${statusRowClass(d.status)}">
+      <td style="color:var(--accent);font-weight:500">${escHtml(d.name)}</td>
+      <td>${escHtml(d.account)}</td>
+      <td>${escHtml(d.owner)}</td>
+      <td style="font-size:11px">${escHtml(d.mlgRep||'')}</td>
+      <td>${statusBadge(d.status)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.stage)}</td>
+      <td><select class="prog-select" data-field="prog" onchange="schedSave()">${selOpts(PROG_OPTIONS, n.prog)}</select></td>
+      <td><textarea rows="2" data-field="weeklyNote" onchange="schedSave()">${escHtml(n.weeklyNote)}</textarea></td>
+      <td><textarea rows="2" data-field="blockers" onchange="schedSave()">${escHtml(n.blockers)}</textarea></td>
+      <td><textarea rows="2" data-field="actions" onchange="schedSave()">${escHtml(n.actions)}</textarea></td>
+      <td><input type="text" data-field="actionOwner" value="${escHtml(n.actionOwner||'')}" onchange="schedSave()"></td>
+      <td><input type="date" data-field="dueDate" value="${n.dueDate||''}" onchange="schedSave()"></td>
+      <td><input type="number" data-field="forecastImpact" value="${n.forecastImpact||''}" style="width:70px" onchange="schedSave()"></td>
+      <td><textarea rows="2" data-field="managerComment" onchange="schedSave()">${escHtml(n.managerComment)}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="metrics" onchange="updateMeddpiccField(${d.id},'metrics',this.value)">${escHtml(mRow.metrics||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="econBuyer" onchange="updateMeddpiccField(${d.id},'econBuyer',this.value)">${escHtml(mRow.econBuyer||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="decCriteria" onchange="updateMeddpiccField(${d.id},'decCriteria',this.value)">${escHtml(mRow.decCriteria||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="decProcess" onchange="updateMeddpiccField(${d.id},'decProcess',this.value)">${escHtml(mRow.decProcess||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="decDate" onchange="updateMeddpiccField(${d.id},'decDate',this.value)">${escHtml(mRow.decDate||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="paperProcess" onchange="updateMeddpiccField(${d.id},'paperProcess',this.value)">${escHtml(mRow.paperProcess||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="identPain" onchange="updateMeddpiccField(${d.id},'identPain',this.value)">${escHtml(mRow.identPain||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="champion" onchange="updateMeddpiccField(${d.id},'champion',this.value)">${escHtml(mRow.champion||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="competition" onchange="updateMeddpiccField(${d.id},'competition',this.value)">${escHtml(mRow.competition||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="biggestGap" onchange="updateMeddpiccField(${d.id},'biggestGap',this.value)">${escHtml(mRow.biggestGap||'')}</textarea></td>
+      <td style="${mBg}"><textarea rows="2" data-mfield="recAction" onchange="updateMeddpiccField(${d.id},'recAction',this.value)">${escHtml(mRow.recAction||'')}</textarea></td>
+      <td style="${mBg};text-align:center">
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:${mColor}">${mScore}%</div>
+        <div style="background:var(--surface3);border-radius:3px;height:5px;margin-top:4px;overflow:hidden">
+          <div style="width:${mScore}%;height:100%;background:${mColor};border-radius:3px"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Update a single MEDDPICC field from Weekly Notes inline edit
+function updateMeddpiccField(dealId, field, value) {
+  // Find existing meddpicc row by dealId — do NOT call syncMeddpiccFromDeals here
+  // as that can overwrite fields that haven't been saved yet
+  let mRow = data.meddpicc.find(m => m.dealId === dealId);
+  if (!mRow) {
+    // Create the row if missing
+    const deal = data.deals.find(d => d.id === dealId);
+    if (!deal) return;
+    mRow = { dealId: deal.id, name: deal.name, account: deal.account, owner: deal.owner,
+      mlgRep: deal.mlgRep||'', metrics:'', econBuyer:'', decCriteria:'', decProcess:'',
+      decDate:'', paperProcess:'', identPain:'', champion: deal.champion||'',
+      competition:'', execSponsor:'No', multiThreaded:'No', secRisk:'No',
+      implPlan:'No', biggestGap:'', recAction:'' };
+    data.meddpicc.push(mRow);
+  }
+  mRow[field] = value;
+  schedSave();
+}
+
+// ===== WEEKLY SUMMARY =====
+function collectTopDeals() {
+  const tbody = document.getElementById('topDealsTbody');
+  if (!tbody) return;
+  data.topDeals = [];
+  tbody.querySelectorAll('tr[data-idx]').forEach((row, i) => {
+    const inputs = row.querySelectorAll('input, select, textarea');
+    data.topDeals.push({
+      name: inputs[0]?.value || '', account: inputs[1]?.value || '',
+      owner: inputs[2]?.value || '', status: inputs[3]?.value || '',
+      prog: inputs[4]?.value || '', keyNotes: inputs[5]?.value || '',
+      actionItem: inputs[6]?.value || '', due: inputs[7]?.value || '',
+      closed: inputs[8]?.value || '', notes: inputs[9]?.value || ''
+    });
+  });
+}
+
+function addTopDeal() {
+  data.topDeals.push({name:'',account:'',owner:'',status:'Active',prog:'→ Flat',keyNotes:'',actionItem:'',due:'',closed:'No',notes:''});
+  renderWeeklySummary(); schedSave();
+}
+
+function collectManagerActions() {
+  const tbody = document.getElementById('managerActionsTbody');
+  if (!tbody) return;
+  data.managerActions = [];
+  tbody.querySelectorAll('tr[data-idx]').forEach(row => {
+    const inputs = row.querySelectorAll('input, select, textarea');
+    data.managerActions.push({
+      priority: inputs[0]?.value || 'Medium', action: inputs[1]?.value || '',
+      deal: inputs[2]?.value || '', owner: inputs[3]?.value || '',
+      dueDate: inputs[4]?.value || '', status: inputs[5]?.value || '',
+      notes: inputs[6]?.value || ''
+    });
+  });
+}
+
+function addManagerAction() {
+  data.managerActions.push({priority:'Medium',action:'',deal:'',owner:'',dueDate:'',status:'Open',notes:''});
+  renderWeeklySummary(); schedSave();
+}
+
+function renderWeeklySummary() {
+  const summWk = document.getElementById('summaryWeekOf');
+  if (summWk && data.summaryWeekOf) summWk.value = data.summaryWeekOf;
+
+  const active = data.deals.filter(d => d.status === 'Active').length;
+  const stalled = data.deals.filter(d => d.status === 'Stalled').length;
+  const notlive = data.deals.filter(d => d.status === 'Not Live').length;
+  const pipeline = data.deals.reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
+  const progressed = (data.weeklyNotes ? Object.values(data.weeklyNotes).filter(n => n.prog === '↑ Progressed').length : 0);
+
+  document.getElementById('summaryKPIs').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Total Active Deals</div><div class="kpi-value green">${active}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Progressed This Week</div><div class="kpi-value accent">${progressed}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Stalled Deals</div><div class="kpi-value yellow">${stalled}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Not Live</div><div class="kpi-value red">${notlive}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Pipeline ($)</div><div class="kpi-value">${fmt$(pipeline)}</div></div>
+  `;
+
+  document.getElementById('topDealsTbody').innerHTML = data.topDeals.map((d, i) => `
+    <tr data-idx="${i}" class="${statusRowClass(d.status)}">
+      <td>${inp(d.name)}</td><td>${inp(d.account)}</td><td>${inp(d.owner)}</td>
+      <td><select onchange="schedSave()">${selOpts(STATUSES, d.status)}</select></td>
+      <td><select onchange="schedSave()">${selOpts(PROG_OPTIONS, d.prog)}</select></td>
+      <td><textarea rows="1" onchange="schedSave()">${escHtml(d.keyNotes)}</textarea></td>
+      <td>${inp(d.actionItem)}</td>
+      <td>${inpDate(d.due)}</td>
+      <td><select onchange="schedSave()"><option ${d.closed==='Yes'?'selected':''}>Yes</option><option ${d.closed!=='Yes'?'selected':''}>No</option></select></td>
+      <td><textarea rows="1" onchange="schedSave()">${escHtml(d.notes)}</textarea></td>
+      <td><button class="delete-btn" onclick="data.topDeals.splice(${i},1);renderWeeklySummary();schedSave()">✕</button></td>
+    </tr>`).join('');
+
+  document.getElementById('managerActionsTbody').innerHTML = data.managerActions.map((a, i) => {
+    const pClass = a.priority === 'High' ? 'priority-high' : a.priority === 'Low' ? 'priority-low' : 'priority-med';
+    return `<tr data-idx="${i}">
+      <td><select class="${pClass}" onchange="schedSave();renderWeeklySummary()"><option ${a.priority==='High'?'selected':''}>High</option><option ${a.priority==='Medium'?'selected':''}>Medium</option><option ${a.priority==='Low'?'selected':''}>Low</option></select></td>
+      <td><textarea rows="1" onchange="schedSave()">${escHtml(a.action)}</textarea></td>
+      <td>${inp(a.deal)}</td><td>${inp(a.owner)}</td>
+      <td>${inpDate(a.dueDate)}</td>
+      <td><select onchange="schedSave()"><option ${a.status==='Open'?'selected':''}>Open</option><option ${a.status==='In Progress'?'selected':''}>In Progress</option><option ${a.status==='Done'?'selected':''}>Done</option></select></td>
+      <td><textarea rows="1" onchange="schedSave()">${escHtml(a.notes)}</textarea></td>
+      <td><button class="delete-btn" onclick="data.managerActions.splice(${i},1);renderWeeklySummary();schedSave()">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== MEDDPICC =====
+function calcMeddpiccScore(m) {
+  const fields = [m.metrics, m.econBuyer, m.decCriteria, m.decProcess, m.decDate, m.paperProcess, m.identPain, m.champion, m.competition];
+  const filled = fields.filter(f => f && f.trim().length > 0).length;
+  return Math.round(filled / 9 * 100);
+}
+
+function collectMeddpicc() {
+  const tbody = document.getElementById('meddpiccTbody');
+  if (!tbody) return;
+  tbody.querySelectorAll('tr[data-idx]').forEach((row, i) => {
+    const m = data.meddpicc[i];
+    if (!m) return;
+    row.querySelectorAll('[data-mfield]').forEach(el => {
+      m[el.dataset.mfield] = el.value || '';
+    });
+  });
+}
+
+function addMeddpicc() {
+  data.meddpicc.push({id: Date.now(), name:'',account:'',owner:'',metrics:'',econBuyer:'',decCriteria:'',decProcess:'',decDate:'',paperProcess:'',identPain:'',champion:'',competition:'',execSponsor:'No',multiThreaded:'No',secRisk:'No',implPlan:'No',biggestGap:'',recAction:''});
+  renderMeddpicc(); schedSave();
+}
+
+function syncMeddpiccFromDeals() {
+  // Add a row for any deal not yet in meddpicc (match by deal id or name)
+  data.deals.forEach(deal => {
+    const exists = data.meddpicc.find(m => m.dealId === deal.id || (m.name === deal.name && deal.name));
+    if (!exists) {
+      data.meddpicc.push({
+        dealId: deal.id, name: deal.name, account: deal.account, owner: deal.owner, mlgRep: deal.mlgRep || '',
+        metrics:'', econBuyer:'', decCriteria:'', decProcess:'', decDate:'',
+        paperProcess:'', identPain:'', champion: deal.champion || '',
+        competition:'', execSponsor:'No', multiThreaded:'No', secRisk:'No',
+        implPlan:'No', biggestGap:'', recAction:''
+      });
+    } else {
+      // Keep name/account/owner/champion in sync with deal tracker
+      exists.dealId = deal.id;
+      exists.name = deal.name;
+      exists.account = deal.account;
+      exists.owner = deal.owner;
+      exists.mlgRep = deal.mlgRep || '';
+      if (!exists.champion && deal.champion) exists.champion = deal.champion;
+    }
+  });
+}
+
+function renderMeddpicc() {
+  syncMeddpiccFromDeals();
+  const dealNames = data.deals.map(d => d.name).filter(Boolean);
+  const tbody = document.getElementById('meddpiccTbody');
+  const yesno = (v) => `<select onchange="schedSave();renderMeddpicc()"><option ${v==='Yes'?'selected':''}>Yes</option><option ${v!=='Yes'?'selected':''}>No</option></select>`;
+
+  tbody.innerHTML = data.meddpicc.map((m, i) => {
+    const score = calcMeddpiccScore(m);
+    const scoreColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+    const isLinked = !!m.dealId;
+    return `<tr data-idx="${i}">
+      <td style="color:var(--accent);font-weight:500">${escHtml(m.name)}${isLinked ? '<span style="font-size:9px;color:var(--text-dim);display:block">auto</span>' : ''}</td>
+      <td style="color:var(--text-muted)">${escHtml(m.account)}</td>
+      <td style="color:var(--text-muted)">${escHtml(m.owner)}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${score}%;background:${scoreColor}"></div></div>
+          <div class="score-pct" style="color:${scoreColor}">${score}%</div>
+        </div>
+      </td>
+      <td><textarea rows="2" data-mfield="metrics" onchange="schedSave();renderMeddpicc()">${escHtml(m.metrics)}</textarea></td>
+      <td><textarea rows="2" data-mfield="econBuyer" onchange="schedSave();renderMeddpicc()">${escHtml(m.econBuyer)}</textarea></td>
+      <td><textarea rows="2" data-mfield="decCriteria" onchange="schedSave();renderMeddpicc()">${escHtml(m.decCriteria)}</textarea></td>
+      <td><textarea rows="2" data-mfield="decProcess" onchange="schedSave();renderMeddpicc()">${escHtml(m.decProcess)}</textarea></td>
+      <td><textarea rows="2" data-mfield="decDate" onchange="schedSave();renderMeddpicc()">${escHtml(m.decDate)}</textarea></td>
+      <td><textarea rows="2" data-mfield="paperProcess" onchange="schedSave();renderMeddpicc()">${escHtml(m.paperProcess)}</textarea></td>
+      <td><textarea rows="2" data-mfield="identPain" onchange="schedSave();renderMeddpicc()">${escHtml(m.identPain)}</textarea></td>
+      <td><textarea rows="2" data-mfield="champion" onchange="schedSave();renderMeddpicc()">${escHtml(m.champion)}</textarea></td>
+      <td><textarea rows="2" data-mfield="competition" onchange="schedSave();renderMeddpicc()">${escHtml(m.competition)}</textarea></td>
+      <td><select data-mfield="execSponsor" onchange="schedSave();renderMeddpicc()"><option ${m.execSponsor==='Yes'?'selected':''}>Yes</option><option ${m.execSponsor!=='Yes'?'selected':''}>No</option></select></td>
+      <td><select data-mfield="multiThreaded" onchange="schedSave();renderMeddpicc()"><option ${m.multiThreaded==='Yes'?'selected':''}>Yes</option><option ${m.multiThreaded!=='Yes'?'selected':''}>No</option></select></td>
+      <td><select data-mfield="secRisk" onchange="schedSave();renderMeddpicc()"><option ${m.secRisk==='Yes'?'selected':''}>Yes</option><option ${m.secRisk!=='Yes'?'selected':''}>No</option></select></td>
+      <td><select data-mfield="implPlan" onchange="schedSave();renderMeddpicc()"><option ${m.implPlan==='Yes'?'selected':''}>Yes</option><option ${m.implPlan!=='Yes'?'selected':''}>No</option></select></td>
+      <td><textarea rows="2" data-mfield="biggestGap" onchange="schedSave()">${escHtml(m.biggestGap)}</textarea></td>
+      <td><textarea rows="2" data-mfield="recAction" onchange="schedSave()">${escHtml(m.recAction)}</textarea></td>
+      <td><button class="delete-btn" onclick="data.meddpicc.splice(${i},1);renderMeddpicc();schedSave()" title="Remove">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  let dl = document.getElementById('dealNameList');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'dealNameList'; document.body.appendChild(dl); }
+  dl.innerHTML = dealNames.map(n => `<option value="${escHtml(n)}">`).join('');
+}
+
+
+// ===== SELLER CREDIT =====
+function renderSellerCredit() {
+  const search = (document.getElementById('scSearch')?.value || '').toLowerCase();
+  const mlgF = document.getElementById('scMLGFilter')?.value || '';
+  const monthF = document.getElementById('scMonthFilter')?.value || '';
+  const stageF = document.getElementById('scStageFilter')?.value || '';
+
+  const mlgSel = document.getElementById('scMLGFilter');
+  if (mlgSel) {
+    const cur = mlgSel.value;
+    mlgSel.innerHTML = '<option value="">All MLG Reps</option>' + MLG_REPS.map(r => `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join('');
+  }
+  const monthSel = document.getElementById('scMonthFilter');
+  if (monthSel) {
+    const cur = monthSel.value;
+    const months = [...new Set(data.deals.map(d => d.closeDate).filter(Boolean))].sort();
+    monthSel.innerHTML = '<option value="">All Close Months</option>' + months.map(m => `<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(fmtCloseMonth(m))}</option>`).join('');
+  }
+  const stageSel = document.getElementById('scStageFilter');
+  if (stageSel) {
+    const cur = stageSel.value;
+    stageSel.innerHTML = '<option value="">All Stages</option>' + STAGES.map(s => `<option value="${escHtml(s)}" ${s===cur?'selected':''}>${escHtml(s)}</option>`).join('');
+  }
+
+  let filtered = data.deals.filter(d => {
+    if (mlgF && d.mlgRep !== mlgF) return false;
+    if (monthF && d.closeDate !== monthF) return false;
+    if (stageF && d.stage !== stageF) return false;
+    if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const totalCredit = filtered.reduce((s,d) => s+(parseFloat(d.sellerCredit)||0), 0);
+  const wonCredit = filtered.filter(d=>d.stage==='Closed Won').reduce((s,d) => s+(parseFloat(d.sellerCredit)||0), 0);
+  const openCredit = filtered.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost').reduce((s,d) => s+(parseFloat(d.sellerCredit)||0), 0);
+  const wtdCredit = filtered.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost').reduce((s,d) => s+(parseFloat(d.sellerCredit)||0)*(parseFloat(d.prob)||0)/100, 0);
+
+  const repData = MLG_REPS.map(rep => ({
+    rep,
+    credit: filtered.filter(d=>d.mlgRep===rep).reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0),
+    won: filtered.filter(d=>d.mlgRep===rep&&d.stage==='Closed Won').reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0),
+  })).filter(r => r.credit > 0);
+
+  const kpiDiv = document.getElementById('scKPIs');
+  kpiDiv.innerHTML = `
+    <div class="kpi-card" style="border-color:rgba(167,139,250,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(167,139,250,0.07) 100%)">
+      <div class="kpi-label" style="color:var(--purple)">Total Seller Credit</div>
+      <div class="kpi-value" style="color:var(--purple)">${fmt$(totalCredit)}</div>
+    </div>
+    <div class="kpi-card" style="border-color:rgba(45,217,143,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(45,217,143,0.07) 100%)">
+      <div class="kpi-label" style="color:var(--green)">🏆 Won Credit</div>
+      <div class="kpi-value green">${fmt$(wonCredit)}</div>
+    </div>
+    <div class="kpi-card"><div class="kpi-label">Open Pipeline Credit</div><div class="kpi-value accent">${fmt$(openCredit)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Wtd Credit</div><div class="kpi-value" style="color:var(--purple)">${fmt$(wtdCredit)}</div></div>
+    ${repData.map(r => `
+    <div class="kpi-card">
+      <div class="kpi-label" style="color:var(--text-muted)">${escHtml(r.rep)}</div>
+      <div class="kpi-value" style="color:var(--purple);font-size:16px">${fmt$(r.credit)}</div>
+      <div style="font-size:10px;color:var(--green);margin-top:4px">🏆 ${fmt$(r.won)} won</div>
+    </div>`).join('')}
+  `;
+
+  const tbody = document.getElementById('scTbody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-dim)">No deals found. Add MLG Seller Credit amounts in the Deal Tracker.</td></tr>`;
+    return;
+  }
+
+  const totalNetACV = filtered.reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+  const totalSC = filtered.reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0);
+  const totalWtdSC = filtered.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost').reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0)*(parseFloat(d.prob)||0)/100,0);
+
+  tbody.innerHTML = filtered.map(d => {
+    const sc = parseFloat(d.sellerCredit)||0;
+    const wtdSC = sc * (parseFloat(d.prob)||0) / 100;
+    const isWon = d.stage === 'Closed Won';
+    return `<tr class="${statusRowClass(d.status)}">
+      <td style="font-weight:500;color:var(--accent)">${escHtml(d.name)}</td>
+      <td>${escHtml(d.account)}</td>
+      <td>${escHtml(d.owner)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.mlgRep||'')}</td>
+      <td>${isWon ? '<span class="badge badge-won">🏆 Won</span>' : statusBadge(d.status)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.stage)}</td>
+      <td>${fmtCloseMonth(d.closeDate)}</td>
+      <td style="color:var(--text-muted)">${fmt$(parseFloat(d.acv)||0)}</td>
+      <td style="color:var(--purple);font-weight:600">${fmt$(sc)}</td>
+      <td>${d.prob||0}%</td>
+      <td style="color:var(--purple)">${isWon ? '—' : fmt$(wtdSC)}</td>
+    </tr>`;
+  }).join('') + `<tr style="background:var(--surface2);font-weight:600;border-top:2px solid var(--border-light)">
+    <td colspan="7" style="color:var(--text-muted);font-size:11px;text-transform:uppercase">Totals (${filtered.length} deals)</td>
+    <td style="color:var(--text-muted)">${fmt$(totalNetACV)}</td>
+    <td style="color:var(--purple)">${fmt$(totalSC)}</td>
+    <td></td>
+    <td style="color:var(--purple)">${fmt$(totalWtdSC)}</td>
+  </tr>`;
+}
+
+// ===== FIREBASE REAL-TIME INIT =====
+const SEED_DATA = {"deals":[{"id":1779195677576,"name":"Agetic AI/MCP","account":"Relation Insurance Services","owner":"Derek Rosales","status":"Active","stage":"Stage 3- Executive Alignment","closeDate":"2026-08","forecastBucket":"Best Case","prob":45,"acv":110000,"lastActivity":"","nextStep":"","notes":"","champion":"","mlgRep":"James Laux"},{"id":1779195770158,"name":"Gusto-miEdge/SFDC","account":"Gusto","owner":"James Laux","status":"Active","stage":"Stage 4- Solution Validation","closeDate":"2026-05","forecastBucket":"Commit","prob":75,"acv":122000,"lastActivity":"","nextStep":"Revised version of NDA/DPA back to Gusto for review","notes":"","champion":"Rob Ryan","mlgRep":"James Laux"},{"id":1779204086302,"name":"ExtensisHR-Jason Ford","account":"Paychex","owner":"James Laux","status":"Active","stage":"Closed Won","closeDate":"2026-05","forecastBucket":"Commit","prob":100,"acv":2500,"lastActivity":"","nextStep":"Docusign signed","notes":"","champion":"","mlgRep":"James Laux"},{"id":1779204172606,"name":"Amendment","account":"The Mahoney Group","owner":"Christian Cordero","status":"Active","stage":"Closed Won","closeDate":"2026-05","forecastBucket":"Commit","prob":100,"acv":2618,"lastActivity":"","nextStep":"Docusign signed","notes":"","champion":"","mlgRep":"James Laux"},{"id":1779205465295,"name":"Frost-AI","account":"Frost Insurance-Austin","owner":"Derek Rosales","status":"Active","stage":"Stage 2- Analysis","closeDate":"2026-06","forecastBucket":"Best Case","prob":0,"acv":100000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779205526909,"name":"CBIZ- AI","account":"CBIZ","owner":"Andrew Holmes","status":"Active","stage":"Stage 1- Unique Meeting Run","closeDate":"2026-06","forecastBucket":"Pipeline","prob":0,"acv":45000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779205559850,"name":"Lawley Insurance-AI","account":"Lawley Insurance","owner":"Andrew Holmes","status":"Not Live","stage":"Stage 0- Unique Meeting Set","closeDate":"2026-06","forecastBucket":"Pipeline","prob":0,"acv":40000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779205588931,"name":"Plexus Group","account":"Plexus Group LLC","owner":"Derek Rosales","status":"Active","stage":"Stage 4- Solution Validation","closeDate":"2026-06","forecastBucket":"Pipeline","prob":0,"acv":12500,"champion":"Matt","lastActivity":"","nextStep":"Call on 27th","notes":"5 producer pilot, $12k","mlgRep":"James Laux"},{"id":1779205625022,"name":"Heffernan Agentic AI","account":"Heffernan Insurance Broker","owner":"Christian Cordero","status":"Active","stage":"Stage 2- Analysis","closeDate":"2026-06","forecastBucket":"Pipeline","prob":0,"acv":30000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779206098541,"name":"Health Partners-miEdge MS Dynamics integration","account":"Health Partners","owner":"James Laux","status":"Active","stage":"Closed Won","closeDate":"2026-05","forecastBucket":"Commit","prob":0,"acv":10000,"champion":"","lastActivity":"","nextStep":"Docusign Signed","notes":"","mlgRep":"James Laux"},{"id":1779206115002,"name":"Health Partners-miEdge","account":"Health Partners","owner":"James Laux","status":"Active","stage":"Closed Won","closeDate":"2026-05","forecastBucket":"Pipeline","prob":0,"acv":10000,"champion":"","lastActivity":"","nextStep":"Docusign Signed","notes":"","mlgRep":"James Laux"}],"weeklyNotes":{"1779195677576":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779195770158":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":"We are at the mercy of procurement. Champion has stated he wants to move forward, legal used buying language, just in a waiting pattern for their completion"},"1779204086302":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779204172606":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205465295":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205526909":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205559850":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205588931":{"prog":"↑ Progressed","weeklyNote":"","blockers":"Could close in May, but most likely June. Gerald could be devils advocate, but sees potential in the process. Younger CEO at 35yrs old. Wants to be tech forward, but also wants to exhibit power","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":"Large pool of unvalidated producers to get them launched to validation. 1 validated producer in the last 10yrs"},"1779205625022":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779206098541":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779206115002":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""}},"weeklyNotesWeekOf":"","summaryWeekOf":"","topDeals":[],"managerActions":[],"meddpicc":[{"dealId":1779195677576,"name":"Agetic AI/MCP","account":"Relation Insurance Services","owner":"Derek Rosales","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779195770158,"name":"Gusto-miEdge/SFDC","account":"Gusto","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"Rob Ryan","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779204086302,"name":"ExtensisHR-Jason Ford","account":"Paychex","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779204172606,"name":"Amendment","account":"The Mahoney Group","owner":"Christian Cordero","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205465295,"name":"Frost-AI","account":"Frost Insurance-Austin","owner":"Derek Rosales","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205526909,"name":"CBIZ- AI","account":"CBIZ","owner":"Andrew Holmes","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205559850,"name":"Lawley Insurance-AI","account":"Lawley Insurance","owner":"Andrew Holmes","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205588931,"name":"Plexus Group","account":"Plexus Group LLC","owner":"Derek Rosales","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"Gerald Fawcett","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205625022,"name":"Heffernan Agentic AI","account":"Heffernan Insurance Broker","owner":"Christian Cordero","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779206098541,"name":"Health Partners-miEdge MS Dynamics integration","account":"Health Partners","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779206115002,"name":"Health Partners-miEdge","account":"Health Partners","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"}],"forecastYear":2026};
+
+function applyData(incoming) {
+  data = incoming;
+  if (!data.deals) data.deals = [];
+  if (!data.weeklyNotes) data.weeklyNotes = {};
+  if (!data.topDeals) data.topDeals = [];
+  if (!data.managerActions) data.managerActions = [];
+  if (!data.meddpicc) data.meddpicc = [];
+  if (!data.forecastYear) data.forecastYear = 2026;
+  syncMeddpiccFromDeals();
+  // Re-render whatever tab is currently active
+  const activePanel = document.querySelector('.panel.active')?.id || '';
+  if (activePanel === 'panel-dealtracker') renderDeals();
+  else if (activePanel === 'panel-forecast') renderForecast();
+  else if (activePanel === 'panel-weeklynotes') renderWeeklyNotes();
+  else if (activePanel === 'panel-weeklysummary') renderWeeklySummary();
+  else if (activePanel === 'panel-meddpicc') renderMeddpicc();
+  else renderDeals(); // default
+  document.getElementById('weekOfDate').value = data.weeklyNotesWeekOf || '';
+  document.getElementById('summaryWeekOf').value = data.summaryWeekOf || '';
+  document.getElementById('forecastYear').value = data.forecastYear || 2026;
+}
+
+// Start Firebase real-time listener
+setSyncStatus('connecting');
+DOC_REF.get().then(doc => {
+  if (doc.exists) {
+    applyData(doc.data());
+    setSyncStatus('live');
+  } else {
+    // First time — seed with existing deals
+    applyData(JSON.parse(JSON.stringify(SEED_DATA)));
+    DOC_REF.set(data).then(() => setSyncStatus('live')).catch(() => setSyncStatus('error'));
+  }
+  // Start live listener for changes from other users
+  unsubscribe = DOC_REF.onSnapshot(snapshot => {
+    if (snapshot.metadata.hasPendingWrites) return; // skip our own writes
+    if (isEditing) return; // skip if user is actively typing/editing
+    if (snapshot.exists) {
+      applyData(snapshot.data());
+      setSyncStatus('live');
+    }
+  }, err => {
+    setSyncStatus('error');
+    console.error('Firestore listener error:', err);
+  });
+}).catch(err => {
+  // Offline fallback — load from localStorage
+  setSyncStatus('offline');
+  const local = localStorage.getItem('mlgTeamTracker_v1');
+  if (local) {
+    applyData(JSON.parse(local));
+  } else {
+    applyData(JSON.parse(JSON.stringify(SEED_DATA)));
+  }
+  console.error('Firebase connect error:', err);
+});
+
+// 30-day rules reminder banner
+const CREATED_DATE = Date.now();
+const storedDate = localStorage.getItem('mlgFirebaseCreated');
+if (!storedDate) localStorage.setItem('mlgFirebaseCreated', CREATED_DATE);
+const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - parseInt(localStorage.getItem('mlgFirebaseCreated')||Date.now())) / 86400000));
+if (daysLeft <= 7 && daysLeft > 0) {
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#f5c842;color:#0d0f14;padding:12px 16px;border-radius:8px;font-size:12px;z-index:9999;max-width:320px;font-family:monospace;box-shadow:0 4px 20px rgba(0,0,0,0.4)';
+  banner.innerHTML = `⚠ Firebase test mode expires in <strong>${daysLeft} day${daysLeft===1?'':'s'}</strong>. <a href="https://console.firebase.google.com/project/mlg-team-tracker/firestore/rules" target="_blank" style="color:#0d0f14;font-weight:700;text-decoration:underline">Update rules now →</a> <span onclick="this.parentElement.remove()" style="cursor:pointer;margin-left:8px">✕</span>`;
+  document.body.appendChild(banner);
+}
+
+
+</script>
+
+<!-- ===== SELLER CREDIT ===== -->
+<div class="panel" id="panel-sellercredit">
+  <div class="section-header">💰 MLG Seller Credit</div>
+  <div class="section-sub">Seller credit amounts per deal — separate from Net ACV. Pipeline and Closed Won KPIs are based on Net ACV; this view shows what each rep is credited for.</div>
+
+  <div class="section-toolbar">
+    <input class="search-input" id="scSearch" placeholder="🔍 Search..." oninput="renderSellerCredit()">
+    <select class="filter-select" id="scMLGFilter" onchange="renderSellerCredit()">
+      <option value="">All MLG Reps</option>
+    </select>
+    <select class="filter-select" id="scMonthFilter" onchange="renderSellerCredit()">
+      <option value="">All Close Months</option>
+    </select>
+    <select class="filter-select" id="scStageFilter" onchange="renderSellerCredit()">
+      <option value="">All Stages</option>
+    </select>
+  </div>
+
+  <div class="kpi-row" id="scKPIs"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th>
+          <th>Status</th><th>Stage</th><th>Close Month</th>
+          <th>Net ACV ($)</th><th>MLG Seller Credit ($)</th><th>Prob %</th><th>Wtd Credit ($)</th>
+        </tr>
+      </thead>
+      <tbody id="scTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>
