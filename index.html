@@ -356,16 +356,12 @@
       <option value="Stalled">🟡 Stalled</option>
       <option value="Not Live">🔴 Not Live</option>
     </select>
-    <select class="filter-select" id="dealMLGFilter" onchange="renderDeals()">
-      <option value="">All MLG Reps</option>
-    </select>
+    <div id="dealMLGFilter"></div>
     <select class="filter-select" id="dealOwnerFilter" onchange="renderDeals()">
       <option value="">All Owners</option>
     </select>
-    <select class="filter-select" id="dealMonthFilter" onchange="renderDeals()">
-      <option value="">All Close Months</option>
-    </select>
-<div id="dealStageFilter"></div>
+    <div id="dealMonthFilter"></div>
+    <div id="dealStageFilter"></div>
   </div>
 
   <div class="table-wrap">
@@ -402,10 +398,8 @@
       <div class="qtab" onclick="showQuarter('Q4', this)">Q4 (Oct–Dec)</div>
     </div>
 
-    <select class="filter-select" id="fcMLGFilter" onchange="renderForecast()">
-      <option value="">All MLG Reps</option>
-    </select>
-<div id="fcStageFilter"></div>
+    <div id="fcMLGFilter"></div>
+    <div id="fcStageFilter"></div>
   </div>
 
   <div id="forecastKPIs" class="kpi-row"></div>
@@ -446,13 +440,9 @@
   <!-- Filters -->
   <div class="section-toolbar" style="margin-bottom:12px">
     <input class="search-input" id="wnSearch" placeholder="🔍 Search deals..." oninput="renderWeeklyNotes()">
-    <select class="filter-select" id="wnRepFilter" onchange="renderWeeklyNotes()">
-      <option value="">All MLG Reps</option>
-    </select>
-<div id="wnStageFilter"></div>
-    <select class="filter-select" id="wnMonthFilter" onchange="renderWeeklyNotes()">
-      <option value="">All Close Months</option>
-    </select>
+    <div id="wnRepFilter"></div>
+    <div id="wnStageFilter"></div>
+    <div id="wnMonthFilter"></div>
     <select class="filter-select" id="wnProgFilter" onchange="renderWeeklyNotes()">
       <option value="">All Progression</option>
       <option value="↑ Progressed">↑ Progressed</option>
@@ -530,12 +520,8 @@
   <div class="section-sub">Complete one row per deal. Score auto-calculates (% of 9 MEDDPICC fields completed). Deal Name & Account pull from Deal Tracker.</div>
 
   <div class="section-toolbar">
-    <select class="filter-select" id="meddpiccRepFilter" onchange="renderMeddpicc()">
-      <option value="">All MLG Reps</option>
-    </select>
-    <select class="filter-select" id="meddpiccMonthFilter" onchange="renderMeddpicc()">
-      <option value="">All Close Months</option>
-    </select>
+    <div id="meddpiccRepFilter"></div>
+        <div id="meddpiccMonthFilter"></div>
     <select class="filter-select" id="meddpiccScoreFilter" onchange="renderMeddpicc()">
       <option value="">All Scores</option>
       <option value="high">Strong (≥70%)</option>
@@ -774,7 +760,8 @@ function showPanel(name) {
 function addDeal() {
   setEditing();
   // Pre-fill mlgRep from the active filter so the new deal shows up immediately
-  const mlgFVal = document.getElementById('dealMLGFilter')?.value || '';
+  const mlgReps2 = getSelectedMS('dealMLGFilter');
+  const mlgFVal = (mlgReps2 && mlgReps2.length === 1) ? mlgReps2[0] : '';
   data.deals.push({
     id: Date.now(), name:'', account:'', owner:'', mlgRep: mlgFVal, status:'Active',
     stage:'Stage 0- Unique Meeting Set', closeDate:'', forecastBucket:'Pipeline',
@@ -811,15 +798,10 @@ function renderDeals() {
   const search = (document.getElementById('dealSearch')?.value || '').toLowerCase();
   const statusF = document.getElementById('dealStatusFilter')?.value || '';
   const ownerF = document.getElementById('dealOwnerFilter')?.value || '';
-  const mlgF = document.getElementById('dealMLGFilter')?.value || '';
-  const monthF = document.getElementById('dealMonthFilter')?.value || '';
+  buildRepMultiSelect('dealMLGFilter', 'renderDeals()');
+  buildMonthMultiSelect('dealMonthFilter', 'renderDeals()');
+  buildStageMultiSelect('dealStageFilter', 'renderDeals()');
 
-  // Populate MLG filter
-  const mlgSel = document.getElementById('dealMLGFilter');
-  if (mlgSel) {
-    const cur = mlgSel.value;
-    mlgSel.innerHTML = '<option value="">All MLG Reps</option>' + MLG_REPS.map(r => `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join('');
-  }
   // Populate owner filter
   const owners = [...new Set(data.deals.map(d => d.owner).filter(Boolean))];
   const ownerSel = document.getElementById('dealOwnerFilter');
@@ -827,30 +809,19 @@ function renderDeals() {
     const cur = ownerSel.value;
     ownerSel.innerHTML = '<option value="">All Owners</option>' + owners.map(o => `<option value="${escHtml(o)}" ${o===cur?'selected':''}>${escHtml(o)}</option>`).join('');
   }
-  buildStageMultiSelect('dealStageFilter', 'renderDeals()');
-  // Populate close month filter dynamically
-  const monthSel = document.getElementById('dealMonthFilter');
-  if (monthSel) {
-    const cur = monthSel.value;
-    const MNAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const months = [...new Set(data.deals.map(d => {
-      // Normalise to plain MM
-      const m4 = d.closeDate && d.closeDate.match(/^\d{4}-(\d{2})$/);
-      return m4 ? m4[1] : (d.closeDate || '');
-    }).filter(Boolean))].sort((a,b)=>parseInt(a)-parseInt(b));
-    monthSel.innerHTML = '<option value="">All Close Months</option>' + months.map(m => {
-      const label = MNAMES[parseInt(m)] || m;
-      return `<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(label)}</option>`;
-    }).join('');
-  }
 
   let filtered = data.deals.filter(d => {
     if (statusF && d.status !== statusF) return false;
     if (ownerF && d.owner !== ownerF) return false;
-    if (mlgF && d.mlgRep !== mlgF) return false;
-    if (monthF && d.closeDate !== monthF) return false;
-    const stagesSel = getSelectedStages('dealStageFilter');
+    const stagesSel = getSelectedMS('dealStageFilter');
     if (stagesSel && !stagesSel.includes(d.stage)) return false;
+    const mlgSel2 = getSelectedMS('dealMLGFilter');
+    if (mlgSel2 && !mlgSel2.includes(d.mlgRep)) return false;
+    const monthSel2 = getSelectedMS('dealMonthFilter');
+    if (monthSel2) {
+      const mm = (d.closeDate||'').replace(/^\d{4}-/,'').replace(/^0*/,'').padStart(2,'0');
+      if (!monthSel2.includes(mm)) return false;
+    }
     if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -862,7 +833,8 @@ function renderDeals() {
   const closedWon = filtered.filter(d => d.stage === 'Closed Won').reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
   const pipeline = filtered.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
   const wtd = filtered.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').reduce((s, d) => s + (parseFloat(d.acv)||0) * (parseFloat(d.prob)||0) / 100, 0);
-  const filterLabel = monthF ? ` — ${fmtCloseMonth(monthF)}` : '';
+  const selMonths = getSelectedMS('dealMonthFilter');
+  const filterLabel = (selMonths && selMonths.length === 1) ? ` — ${fmtCloseMonth(selMonths[0])}` : '';
   document.getElementById('dealKPIs').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Active Deals${filterLabel}</div><div class="kpi-value green">${active}</div></div>
     <div class="kpi-card"><div class="kpi-label">Stalled${filterLabel}</div><div class="kpi-value yellow">${stalled}</div></div>
@@ -922,16 +894,7 @@ function renderForecast() {
   const year = parseInt(document.getElementById('forecastYear')?.value) || 2026;
   const months = Q_MONTHS[currentQuarter];
   const [m1, m2, m3] = months.map(m => MONTH_NUMS[m]);
-  const mlgF = document.getElementById('fcMLGFilter')?.value || '';
-
-  // Populate MLG filter
-  const mlgSel = document.getElementById('fcMLGFilter');
-  if (mlgSel) {
-    const cur = mlgSel.value;
-    mlgSel.innerHTML = '<option value="">All MLG Reps</option>' + MLG_REPS.map(r =>
-      `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`
-    ).join('');
-  }
+  buildRepMultiSelect('fcMLGFilter', 'renderForecast()');
   buildStageMultiSelect('fcStageFilter', 'renderForecast()');
 
   const allQDeals = data.deals.filter(d => {
@@ -942,9 +905,10 @@ function renderForecast() {
     return yearOk && [m1, m2, m3].includes(mo);
   });
 
-  const fcStages = getSelectedStages('fcStageFilter');
+  const fcStages = getSelectedMS('fcStageFilter');
+  const fcReps = getSelectedMS('fcMLGFilter');
   const deals = allQDeals.filter(d => {
-    if (mlgF && d.mlgRep !== mlgF) return false;
+    if (fcReps && !fcReps.includes(d.mlgRep)) return false;
     if (fcStages && !fcStages.includes(d.stage)) return false;
     return true;
   });
@@ -1184,16 +1148,12 @@ function renderWeeklyNotes() {
   }
 
   // Populate filters
-  const repSel = document.getElementById('wnRepFilter');
-  if (repSel) { const cur=repSel.value; repSel.innerHTML='<option value="">All MLG Reps</option>'+MLG_REPS.map(r=>`<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join(''); }
+  buildRepMultiSelect('wnRepFilter', 'renderWeeklyNotes()');
   buildStageMultiSelect('wnStageFilter', 'renderWeeklyNotes()');
-  const monthSel = document.getElementById('wnMonthFilter');
-  if (monthSel) { const cur=monthSel.value; const months=[...new Set(data.deals.map(d=>d.closeDate).filter(Boolean))].sort(); monthSel.innerHTML='<option value="">All Close Months</option>'+months.map(m=>`<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(fmtCloseMonth(m))}</option>`).join(''); }
+  buildMonthMultiSelect('wnMonthFilter', 'renderWeeklyNotes()');
 
   // Get filter values
   const search = (document.getElementById('wnSearch')?.value||'').toLowerCase();
-  const repF   = document.getElementById('wnRepFilter')?.value||'';
-  const monthF = document.getElementById('wnMonthFilter')?.value||'';
   const progF  = document.getElementById('wnProgFilter')?.value||'';
 
   // Current week notes
@@ -1203,10 +1163,15 @@ function renderWeeklyNotes() {
 
   let deals = data.deals.filter(d => {
     if (d.status === 'Not Live' && !curNotes[d.id]) return false;
-    if (repF   && d.mlgRep !== repF) return false;
-    const wnStages = getSelectedStages('wnStageFilter');
+    const wnReps = getSelectedMS('wnRepFilter');
+    if (wnReps && !wnReps.includes(d.mlgRep)) return false;
+    const wnStages = getSelectedMS('wnStageFilter');
     if (wnStages && !wnStages.includes(d.stage)) return false;
-    if (monthF && d.closeDate !== monthF) return false;
+    const wnMonths = getSelectedMS('wnMonthFilter');
+    if (wnMonths) {
+      const mm = (d.closeDate||'').replace(/^\d{4}-/,'').replace(/^0*/,'').padStart(2,'0');
+      if (!wnMonths.includes(mm)) return false;
+    }
     if (progF) { const n=curNotes[d.id]||{}; if (n.prog !== progF) return false; }
     if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
     return true;
@@ -1431,27 +1396,8 @@ function renderMeddpicc() {
   const dealNames = data.deals.map(d => d.name).filter(Boolean);
   const tbody = document.getElementById('meddpiccTbody');
 
-  // Populate rep filter
-  const repSel = document.getElementById('meddpiccRepFilter');
-  if (repSel) { const cur=repSel.value; repSel.innerHTML='<option value="">All MLG Reps</option>'+MLG_REPS.map(r=>`<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join(''); }
-
-  // Populate month filter from deals
-  const monthSel = document.getElementById('meddpiccMonthFilter');
-  if (monthSel) {
-    const cur = monthSel.value;
-    const MNAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const months = [...new Set(data.deals.map(d => {
-      const m4 = d.closeDate && d.closeDate.match(/^\d{4}-(\d{2})$/);
-      return m4 ? m4[1] : (d.closeDate || '');
-    }).filter(Boolean))].sort((a,b)=>parseInt(a)-parseInt(b));
-    monthSel.innerHTML = '<option value="">All Close Months</option>' + months.map(m =>
-      `<option value="${escHtml(m)}" ${m===cur?'selected':''}>${MNAMES[parseInt(m)]||m}</option>`
-    ).join('');
-  }
-
-  // Get filter values
-  const repF   = document.getElementById('meddpiccRepFilter')?.value || '';
-  const monthF = document.getElementById('meddpiccMonthFilter')?.value || '';
+  buildRepMultiSelect('meddpiccRepFilter', 'renderMeddpicc()');
+  buildMonthMultiSelect('meddpiccMonthFilter', 'renderMeddpicc()');
   const scoreF = document.getElementById('meddpiccScoreFilter')?.value || '';
 
   const yesno = (v, field) => `<select data-mfield="${field}" onchange="schedSave();renderMeddpicc()"><option ${v==='Yes'?'selected':''}>Yes</option><option ${v!=='Yes'?'selected':''}>No</option></select>`;
@@ -1459,15 +1405,17 @@ function renderMeddpicc() {
   // Filter meddpicc rows — look up deal for rep and closeDate
   const rows = data.meddpicc.filter((m, i) => {
     if (!m.name) return false;
-    if (repF) {
+    const mReps = getSelectedMS('meddpiccRepFilter');
+    if (mReps) {
       const deal = data.deals.find(d => d.id === m.dealId || d.name === m.name);
-      if (!deal || deal.mlgRep !== repF) return false;
+      if (!deal || !mReps.includes(deal.mlgRep)) return false;
     }
-    if (monthF) {
+    const mMonths = getSelectedMS('meddpiccMonthFilter');
+    if (mMonths) {
       const deal = data.deals.find(d => d.id === m.dealId || d.name === m.name);
       const cd = deal?.closeDate || '';
-      const mm = cd.match(/^\d{4}-(\d{2})$/) ? cd.match(/^\d{4}-(\d{2})$/)[1] : cd;
-      if (mm !== monthF) return false;
+      const mm = (cd.replace(/^\d{4}-/,'')||'').replace(/^0*/,'').padStart(2,'0');
+      if (!mMonths.includes(mm)) return false;
     }
     if (scoreF) {
       const s = calcMeddpiccScore(m);
@@ -1524,28 +1472,21 @@ function renderMeddpicc() {
 // ===== SELLER CREDIT =====
 function renderSellerCredit() {
   const search = (document.getElementById('scSearch')?.value || '').toLowerCase();
-  const mlgF = document.getElementById('scMLGFilter')?.value || '';
-  const monthF = document.getElementById('scMonthFilter')?.value || '';
 
-  const mlgSel = document.getElementById('scMLGFilter');
-  if (mlgSel) {
-    const cur = mlgSel.value;
-    mlgSel.innerHTML = '<option value="">All MLG Reps</option>' + MLG_REPS.map(r => `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join('');
-  }
-  const monthSel = document.getElementById('scMonthFilter');
-  if (monthSel) {
-    const cur = monthSel.value;
-    const months = [...new Set(data.deals.map(d => d.closeDate).filter(Boolean))].sort();
-    monthSel.innerHTML = '<option value="">All Close Months</option>' + months.map(m => `<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(fmtCloseMonth(m))}</option>`).join('');
-  }
+  buildRepMultiSelect('scMLGFilter', 'renderSellerCredit()');
+  buildMonthMultiSelect('scMonthFilter', 'renderSellerCredit()');
   buildStageMultiSelect('scStageFilter', 'renderSellerCredit()');
 
-  const scStages = getSelectedStages('scStageFilter');
+  const scStages = getSelectedMS('scStageFilter');
+  const scReps   = getSelectedMS('scMLGFilter');
+  const scMonths = getSelectedMS('scMonthFilter');
   let filtered = data.deals.filter(d => {
-    if (mlgF && d.mlgRep !== mlgF) return false;
-    if (monthF && d.closeDate !== monthF) return false;
-    const stagesSel = getSelectedStages('dealStageFilter');
-    if (stagesSel && !stagesSel.includes(d.stage)) return false;
+    if (scReps && !scReps.includes(d.mlgRep)) return false;
+    if (scMonths) {
+      const mm = (d.closeDate||'').replace(/^\d{4}-/,'').replace(/^0*/,'').padStart(2,'0');
+      if (!scMonths.includes(mm)) return false;
+    }
+    if (scStages && !scStages.includes(d.stage)) return false;
     if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -1619,35 +1560,70 @@ function renderSellerCredit() {
 
 
 // ===== MULTI-SELECT STAGE FILTER =====
-function buildStageMultiSelect(containerId, onChange) {
+// Generic multi-select builder — works for stages, reps, months, any list
+function buildMultiSelect(containerId, options, allLabel, onChange) {
   const wrap = document.getElementById(containerId);
-  if (!wrap || wrap.querySelector('.ms-btn')) return; // already built
+  if (!wrap || wrap.querySelector('.ms-btn')) return; // already built — preserve selections
   wrap.innerHTML = `
     <div class="ms-wrap" id="${containerId}_wrap">
-      <button class="ms-btn" id="${containerId}_btn" type="button">All Stages</button>
+      <button class="ms-btn" id="${containerId}_btn" type="button">${allLabel}</button>
       <div class="ms-dropdown" id="${containerId}_dd">
         <div class="ms-controls">
-          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',true,'${onChange}')">Select All</button>
-          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',false,'${onChange}')">Clear All</button>
+          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',true,'${onChange}','${allLabel}')">Select All</button>
+          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',false,'${onChange}','${allLabel}')">Clear All</button>
         </div>
-        ${STAGES.map((s,i) => `
+        ${options.map(s => `
           <label class="ms-item" onclick="event.stopPropagation()">
-            <input type="checkbox" value="${escHtml(s)}" checked
-              onchange="updateMSLabel('${containerId}');(function(){${onChange}})()">
-            ${escHtml(s)}
+            <input type="checkbox" value="${String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" checked
+              onchange="updateMSLabel('${containerId}','${allLabel}');(new Function('${onChange.replace(/'/g,"\'")}'))()">
+            ${String(s).replace(/</g,'&lt;')}
           </label>`).join('')}
       </div>
     </div>`;
-
-  // Toggle open/close on button click
   const btn = document.getElementById(containerId + '_btn');
   const dd  = document.getElementById(containerId + '_dd');
   btn.addEventListener('click', e => {
     e.stopPropagation();
-    // Close all other dropdowns first
-    document.querySelectorAll('.ms-dropdown.open').forEach(el => {
-      if (el !== dd) el.classList.remove('open');
-    });
+    document.querySelectorAll('.ms-dropdown.open').forEach(el => { if (el !== dd) el.classList.remove('open'); });
+    dd.classList.toggle('open');
+  });
+}
+
+// Convenience wrappers
+function buildStageMultiSelect(containerId, onChange) {
+  buildMultiSelect(containerId, STAGES, 'All Stages', onChange);
+}
+function buildRepMultiSelect(containerId, onChange) {
+  buildMultiSelect(containerId, MLG_REPS, 'All Reps', onChange);
+}
+function buildMonthMultiSelect(containerId, onChange) {
+  const MNAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Use numeric values so filtering works, display month names
+  const container = document.getElementById(containerId);
+  if (!container || container.querySelector('.ms-btn')) return;
+  container.innerHTML = `
+    <div class="ms-wrap" id="${containerId}_wrap">
+      <button class="ms-btn" id="${containerId}_btn" type="button">All Months</button>
+      <div class="ms-dropdown" id="${containerId}_dd">
+        <div class="ms-controls">
+          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',true,'${onChange}','All Months')">Select All</button>
+          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',false,'${onChange}','All Months')">Clear All</button>
+        </div>
+        ${MNAMES.map((name, i) => {
+          const val = String(i+1).padStart(2,'0');
+          return `<label class="ms-item" onclick="event.stopPropagation()">
+            <input type="checkbox" value="${val}" checked
+              onchange="updateMSLabel('${containerId}','All Months');(new Function('${onChange.replace(/'/g,"\'")}'))()">
+            ${name}
+          </label>`;
+        }).join('')}
+      </div>
+    </div>`;
+  const btn = document.getElementById(containerId + '_btn');
+  const dd  = document.getElementById(containerId + '_dd');
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.ms-dropdown.open').forEach(el => { if (el !== dd) el.classList.remove('open'); });
     dd.classList.toggle('open');
   });
 }
@@ -1662,25 +1638,27 @@ if (!window._msListenerAdded) {
   });
 }
 
-function selectAllMS(id, checked, onChange) {
+function selectAllMS(id, checked, onChange, allLabel) {
   document.querySelectorAll(`#${id}_dd input[type=checkbox]`).forEach(cb => cb.checked = checked);
-  updateMSLabel(id);
+  updateMSLabel(id, allLabel||'All');
   if (onChange) (new Function(onChange))();
 }
 
-function updateMSLabel(id) {
+function updateMSLabel(id, allLabel) {
   const checks = [...document.querySelectorAll(`#${id}_dd input[type=checkbox]`)];
   const selected = checks.filter(c => c.checked);
   const btn = document.getElementById(id + '_btn');
   if (!btn) return;
+  const lbl = allLabel || btn.dataset.allLabel || 'All';
+  btn.dataset.allLabel = lbl;
   if (selected.length === 0) {
-    btn.textContent = 'No Stages';
+    btn.textContent = 'None Selected';
     btn.classList.add('active');
   } else if (selected.length === checks.length) {
-    btn.textContent = 'All Stages';
+    btn.textContent = lbl;
     btn.classList.remove('active');
   } else {
-    btn.textContent = `${selected.length} Stage${selected.length>1?'s':''} Selected`;
+    btn.textContent = `${selected.length} Selected`;
     btn.classList.add('active');
   }
   checks.forEach(cb => cb.closest('.ms-item')?.classList.toggle('checked', cb.checked));
@@ -1692,6 +1670,8 @@ function getSelectedStages(id) {
   const selected = checks.filter(c => c.checked).map(c => c.value);
   return selected.length === checks.length ? null : selected;
 }
+// Alias for any multi-select (reps, months, etc.)
+const getSelectedMS = getSelectedStages;
 
 // ===== FIREBASE REAL-TIME INIT =====
 const SEED_DATA = {"deals":[{"id":1779195677576,"name":"Agetic AI/MCP","account":"Relation Insurance Services","owner":"Derek Rosales","status":"Active","stage":"Stage 3- Executive Alignment","closeDate":"08","forecastBucket":"Best Case","prob":45,"acv":110000,"lastActivity":"","nextStep":"","notes":"","champion":"","mlgRep":"James Laux"},{"id":1779195770158,"name":"Gusto-miEdge/SFDC","account":"Gusto","owner":"James Laux","status":"Active","stage":"Stage 4- Solution Validation","closeDate":"05","forecastBucket":"Commit","prob":75,"acv":122000,"lastActivity":"","nextStep":"Revised version of NDA/DPA back to Gusto for review","notes":"","champion":"Rob Ryan","mlgRep":"James Laux"},{"id":1779204086302,"name":"ExtensisHR-Jason Ford","account":"Paychex","owner":"James Laux","status":"Active","stage":"Closed Won","closeDate":"05","forecastBucket":"Commit","prob":100,"acv":2500,"lastActivity":"","nextStep":"Docusign signed","notes":"","champion":"","mlgRep":"James Laux"},{"id":1779204172606,"name":"Amendment","account":"The Mahoney Group","owner":"Christian Cordero","status":"Active","stage":"Closed Won","closeDate":"05","forecastBucket":"Commit","prob":100,"acv":2618,"lastActivity":"","nextStep":"Docusign signed","notes":"","champion":"","mlgRep":"James Laux"},{"id":1779205465295,"name":"Frost-AI","account":"Frost Insurance-Austin","owner":"Derek Rosales","status":"Active","stage":"Stage 2- Analysis","closeDate":"06","forecastBucket":"Best Case","prob":0,"acv":100000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779205526909,"name":"CBIZ- AI","account":"CBIZ","owner":"Andrew Holmes","status":"Active","stage":"Stage 1- Unique Meeting Run","closeDate":"06","forecastBucket":"Pipeline","prob":0,"acv":45000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779205559850,"name":"Lawley Insurance-AI","account":"Lawley Insurance","owner":"Andrew Holmes","status":"Not Live","stage":"Stage 0- Unique Meeting Set","closeDate":"06","forecastBucket":"Pipeline","prob":0,"acv":40000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779205588931,"name":"Plexus Group","account":"Plexus Group LLC","owner":"Derek Rosales","status":"Active","stage":"Stage 4- Solution Validation","closeDate":"06","forecastBucket":"Pipeline","prob":0,"acv":12500,"champion":"Matt","lastActivity":"","nextStep":"Call on 27th","notes":"5 producer pilot, $12k","mlgRep":"James Laux"},{"id":1779205625022,"name":"Heffernan Agentic AI","account":"Heffernan Insurance Broker","owner":"Christian Cordero","status":"Active","stage":"Stage 2- Analysis","closeDate":"06","forecastBucket":"Pipeline","prob":0,"acv":30000,"champion":"","lastActivity":"","nextStep":"","notes":"","mlgRep":"James Laux"},{"id":1779206098541,"name":"Health Partners-miEdge MS Dynamics integration","account":"Health Partners","owner":"James Laux","status":"Active","stage":"Closed Won","closeDate":"05","forecastBucket":"Commit","prob":0,"acv":10000,"champion":"","lastActivity":"","nextStep":"Docusign Signed","notes":"","mlgRep":"James Laux"},{"id":1779206115002,"name":"Health Partners-miEdge","account":"Health Partners","owner":"James Laux","status":"Active","stage":"Closed Won","closeDate":"05","forecastBucket":"Pipeline","prob":0,"acv":10000,"champion":"","lastActivity":"","nextStep":"Docusign Signed","notes":"","mlgRep":"James Laux"}],"weeklyNotes":{"1779195677576":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779195770158":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":"We are at the mercy of procurement. Champion has stated he wants to move forward, legal used buying language, just in a waiting pattern for their completion"},"1779204086302":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779204172606":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205465295":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205526909":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205559850":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779205588931":{"prog":"↑ Progressed","weeklyNote":"","blockers":"Could close in May, but most likely June. Gerald could be devils advocate, but sees potential in the process. Younger CEO at 35yrs old. Wants to be tech forward, but also wants to exhibit power","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":"Large pool of unvalidated producers to get them launched to validation. 1 validated producer in the last 10yrs"},"1779205625022":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779206098541":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""},"1779206115002":{"prog":"↑ Progressed","weeklyNote":"","blockers":"","actions":"","actionOwner":"","dueDate":"","forecastImpact":"","managerComment":""}},"weeklyNotesWeekOf":"","summaryWeekOf":"","topDeals":[],"managerActions":[],"meddpicc":[{"dealId":1779195677576,"name":"Agetic AI/MCP","account":"Relation Insurance Services","owner":"Derek Rosales","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779195770158,"name":"Gusto-miEdge/SFDC","account":"Gusto","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"Rob Ryan","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779204086302,"name":"ExtensisHR-Jason Ford","account":"Paychex","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779204172606,"name":"Amendment","account":"The Mahoney Group","owner":"Christian Cordero","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205465295,"name":"Frost-AI","account":"Frost Insurance-Austin","owner":"Derek Rosales","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205526909,"name":"CBIZ- AI","account":"CBIZ","owner":"Andrew Holmes","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205559850,"name":"Lawley Insurance-AI","account":"Lawley Insurance","owner":"Andrew Holmes","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205588931,"name":"Plexus Group","account":"Plexus Group LLC","owner":"Derek Rosales","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"Gerald Fawcett","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779205625022,"name":"Heffernan Agentic AI","account":"Heffernan Insurance Broker","owner":"Christian Cordero","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779206098541,"name":"Health Partners-miEdge MS Dynamics integration","account":"Health Partners","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"},{"dealId":1779206115002,"name":"Health Partners-miEdge","account":"Health Partners","owner":"James Laux","metrics":"","econBuyer":"","decCriteria":"","decProcess":"","decDate":"","paperProcess":"","identPain":"","champion":"","competition":"","execSponsor":"No","multiThreaded":"No","secRisk":"No","implPlan":"No","biggestGap":"","recAction":"","mlgRep":"James Laux"}],"forecastYear":2026};
@@ -1783,13 +1763,9 @@ if (daysLeft <= 7 && daysLeft > 0) {
 
   <div class="section-toolbar">
     <input class="search-input" id="scSearch" placeholder="🔍 Search..." oninput="renderSellerCredit()">
-    <select class="filter-select" id="scMLGFilter" onchange="renderSellerCredit()">
-      <option value="">All MLG Reps</option>
-    </select>
-    <select class="filter-select" id="scMonthFilter" onchange="renderSellerCredit()">
-      <option value="">All Close Months</option>
-    </select>
-<div id="scStageFilter"></div>
+    <div id="scMLGFilter"></div>
+    <div id="scMonthFilter"></div>
+    <div id="scStageFilter"></div>
   </div>
 
   <div class="kpi-row" id="scKPIs"></div>
