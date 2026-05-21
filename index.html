@@ -716,8 +716,10 @@ function showPanel(name) {
 // ===== DEAL TRACKER =====
 function addDeal() {
   setEditing();
+  // Pre-fill mlgRep from the active filter so the new deal shows up immediately
+  const mlgFVal = document.getElementById('dealMLGFilter')?.value || '';
   data.deals.push({
-    id: Date.now(), name:'', account:'', owner:'', mlgRep:'', status:'Active',
+    id: Date.now(), name:'', account:'', owner:'', mlgRep: mlgFVal, status:'Active',
     stage:'Stage 0- Unique Meeting Set', closeDate:'', forecastBucket:'Pipeline',
     prob:0, acv:0, sellerCredit:0, champion:'', lastActivity:'', nextStep:'', notes:''
   });
@@ -910,17 +912,19 @@ function renderForecast() {
     <th>Close Month</th><th>Prob %</th><th>Net ACV ($)</th>
     <th class="month-val">${months[0]} ($)</th><th class="month-val">${months[1]} ($)</th><th class="month-val">${months[2]} ($)</th>
     <th>${currentQuarter} Total ($)</th><th class="wtd-val">Wtd Value ($)</th>
+    <th style="color:var(--purple)">Seller Credit ($)</th>
     <th>Champion</th><th>Next Step</th>
   </tr>`;
 
-  let totals = {m1:0, m2:0, m3:0, total:0, wtd:0};
+  let totals = {m1:0, m2:0, m3:0, total:0, wtd:0, sc:0};
   const tbody = document.getElementById('forecastTbody');
   tbody.innerHTML = deals.map(d => {
     const mo = getMonthFromDate(d.closeDate);
     const acv = parseFloat(d.acv) || 0;
+    const sc = parseFloat(d.sellerCredit) || 0;
     const v1 = mo === m1 ? acv : 0, v2 = mo === m2 ? acv : 0, v3 = mo === m3 ? acv : 0;
     const wtd = acv * (parseFloat(d.prob)||0) / 100;
-    totals.m1 += v1; totals.m2 += v2; totals.m3 += v3; totals.total += acv; totals.wtd += wtd;
+    totals.m1 += v1; totals.m2 += v2; totals.m3 += v3; totals.total += acv; totals.wtd += wtd; totals.sc += sc;
     return `<tr class="${statusRowClass(d.status)}">
       <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.mlgRep||'')}</td>
       <td style="font-weight:500">${escHtml(d.name)}</td><td>${escHtml(d.account)}</td><td>${escHtml(d.owner)}</td>
@@ -930,12 +934,15 @@ function renderForecast() {
       <td class="month-val">${v2 ? fmt$(v2) : '—'}</td>
       <td class="month-val">${v3 ? fmt$(v3) : '—'}</td>
       <td>${fmt$(acv)}</td><td class="wtd-val">${fmt$(wtd)}</td>
+      <td style="color:var(--purple);font-weight:500">${sc ? fmt$(sc) : '—'}</td>
       <td style="font-size:11px">${escHtml(d.champion)}</td><td style="font-size:11px;color:var(--text-muted)">${escHtml(d.nextStep)}</td>
     </tr>`;
   }).join('') + `<tr style="background:var(--surface2);font-weight:600;border-top:2px solid var(--border-light)">
     <td colspan="9" style="color:var(--text-muted);font-size:11px;text-transform:uppercase">Totals (${deals.length} deals)</td>
     <td class="month-val">${fmt$(totals.m1)}</td><td class="month-val">${fmt$(totals.m2)}</td><td class="month-val">${fmt$(totals.m3)}</td>
-    <td>${fmt$(totals.total)}</td><td class="wtd-val">${fmt$(totals.wtd)}</td><td colspan="2"></td>
+    <td>${fmt$(totals.total)}</td><td class="wtd-val">${fmt$(totals.wtd)}</td>
+    <td style="color:var(--purple)">${fmt$(totals.sc)}</td>
+    <td colspan="2"></td>
   </tr>`;
 
   // Main KPI cards
@@ -946,13 +953,18 @@ function renderForecast() {
     <div class="kpi-card"><div class="kpi-label">${months[2]}</div><div class="kpi-value">${fmt$(totals.m3)}</div></div>
     <div class="kpi-card"><div class="kpi-label">${currentQuarter} Total Pipeline</div><div class="kpi-value green">${fmt$(totals.total)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Wtd Pipeline</div><div class="kpi-value" style="color:var(--purple)">${fmt$(totals.wtd)}</div></div>
+    <div class="kpi-card" style="border-color:rgba(167,139,250,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(167,139,250,0.07) 100%)">
+      <div class="kpi-label" style="color:var(--purple)">💰 Seller Credit</div>
+      <div class="kpi-value" style="color:var(--purple)">${fmt$(totals.sc)}</div>
+    </div>
   `;
 
   // Per-rep pipeline scorecards
   const repCards = document.getElementById('forecastRepCards');
   repCards.innerHTML = MLG_REPS.map(rep => {
-    const repDeals = allQDeals.filter(d => d.mlgRep === rep && d.stage !== 'Closed Lost');
-    const repPipe = repDeals.filter(d=>d.stage!=='Closed Won').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+    const repDeals = allQDeals.filter(d => d.mlgRep === rep);
+    // Only Active deals count toward pipeline viability (excludes Stalled, Not Live, Closed Lost)
+    const repPipe = repDeals.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost'&&d.status==='Active').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
     const repWon = repDeals.filter(d=>d.stage==='Closed Won').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
     const quota = (QUOTAS[rep] && QUOTAS[rep][currentQuarter]) || 0;
     const remaining = Math.max(0, quota - repWon);
@@ -976,6 +988,7 @@ function renderForecast() {
         <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Pipe Needed (3x)</div><div style="font-size:12px;color:var(--yellow);font-weight:600">${fmt$(pipeNeeded)}</div></div>
         <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Open Pipeline</div><div style="font-size:12px;color:var(--accent);font-weight:600">${fmt$(repPipe)}</div></div>
         <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">Coverage</div><div style="font-size:12px;font-weight:700;color:${barColor}">${coverageMultiple}x</div></div>
+        <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase">💰 Seller Credit</div><div style="font-size:12px;color:var(--purple);font-weight:600">${fmt$(repDeals.reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0))}</div></div>
       </div>
       <div style="background:var(--surface3);border-radius:4px;height:6px;margin-bottom:6px;overflow:hidden">
         <div style="width:${coveragePct}%;height:100%;background:${barColor};border-radius:4px;transition:width 0.5s"></div>
