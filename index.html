@@ -1621,40 +1621,51 @@ function renderSellerCredit() {
 // ===== MULTI-SELECT STAGE FILTER =====
 function buildStageMultiSelect(containerId, onChange) {
   const wrap = document.getElementById(containerId);
-  if (!wrap) return;
+  if (!wrap || wrap.querySelector('.ms-btn')) return; // already built
   wrap.innerHTML = `
     <div class="ms-wrap" id="${containerId}_wrap">
-      <button class="ms-btn" id="${containerId}_btn" onclick="toggleMS('${containerId}')">All Stages</button>
+      <button class="ms-btn" id="${containerId}_btn" type="button">All Stages</button>
       <div class="ms-dropdown" id="${containerId}_dd">
         <div class="ms-controls">
-          <button class="ms-ctrl-btn" onclick="selectAllMS('${containerId}',true)">Select All</button>
-          <button class="ms-ctrl-btn" onclick="selectAllMS('${containerId}',false)">Clear All</button>
+          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',true,'${onChange}')">Select All</button>
+          <button class="ms-ctrl-btn" type="button" onclick="selectAllMS('${containerId}',false,'${onChange}')">Clear All</button>
         </div>
         ${STAGES.map((s,i) => `
-          <label class="ms-item" id="${containerId}_item_${i}">
-            <input type="checkbox" value="${s.replace(/"/g,'&quot;')}" checked
-              onchange="updateMSLabel('${containerId}');${onChange}">
-            ${s}
+          <label class="ms-item" onclick="event.stopPropagation()">
+            <input type="checkbox" value="${escHtml(s)}" checked
+              onchange="updateMSLabel('${containerId}');(function(){${onChange}})()">
+            ${escHtml(s)}
           </label>`).join('')}
       </div>
     </div>`;
-  // Close on outside click
+
+  // Toggle open/close on button click
+  const btn = document.getElementById(containerId + '_btn');
+  const dd  = document.getElementById(containerId + '_dd');
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    // Close all other dropdowns first
+    document.querySelectorAll('.ms-dropdown.open').forEach(el => {
+      if (el !== dd) el.classList.remove('open');
+    });
+    dd.classList.toggle('open');
+  });
+}
+
+// Close dropdowns when clicking outside — use non-capturing listener
+if (!window._msListenerAdded) {
+  window._msListenerAdded = true;
   document.addEventListener('click', e => {
-    const wrap2 = document.getElementById(containerId + '_wrap');
-    if (wrap2 && !wrap2.contains(e.target)) {
-      document.getElementById(containerId + '_dd')?.classList.remove('open');
+    if (!e.target.closest('.ms-wrap')) {
+      document.querySelectorAll('.ms-dropdown.open').forEach(el => el.classList.remove('open'));
     }
-  }, true);
+  });
 }
 
-function toggleMS(id) {
-  const dd = document.getElementById(id + '_dd');
-  dd?.classList.toggle('open');
-}
-
-function selectAllMS(id, checked) {
+function selectAllMS(id, checked, onChange) {
   document.querySelectorAll(`#${id}_dd input[type=checkbox]`).forEach(cb => cb.checked = checked);
   updateMSLabel(id);
+  if (onChange) (new Function(onChange))();
 }
 
 function updateMSLabel(id) {
@@ -1672,17 +1683,14 @@ function updateMSLabel(id) {
     btn.textContent = `${selected.length} Stage${selected.length>1?'s':''} Selected`;
     btn.classList.add('active');
   }
-  // Update item styling
-  checks.forEach(cb => {
-    cb.closest('.ms-item')?.classList.toggle('checked', cb.checked);
-  });
+  checks.forEach(cb => cb.closest('.ms-item')?.classList.toggle('checked', cb.checked));
 }
 
 function getSelectedStages(id) {
   const checks = [...document.querySelectorAll(`#${id}_dd input[type=checkbox]`)];
-  if (!checks.length) return null; // not built yet — no filter
+  if (!checks.length) return null;
   const selected = checks.filter(c => c.checked).map(c => c.value);
-  return selected.length === checks.length ? null : selected; // null = all selected = no filter
+  return selected.length === checks.length ? null : selected;
 }
 
 // ===== FIREBASE REAL-TIME INIT =====
