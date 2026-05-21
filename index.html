@@ -177,6 +177,63 @@
   .priority-low { color: var(--text-muted); }
 
   /* SCROLLBAR */
+
+  /* MULTI-SELECT STAGE FILTER */
+  .ms-wrap { position: relative; display: inline-block; }
+  .ms-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted);
+    font-family: var(--mono); font-size: 11px; padding: 5px 28px 5px 10px; border-radius: 6px;
+    cursor: pointer; white-space: nowrap; min-width: 140px; text-align: left; outline: none;
+    position: relative; user-select: none;
+  }
+  .ms-btn::after { content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+  .ms-btn.active { border-color: var(--accent); color: var(--accent); }
+  .ms-dropdown {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 500;
+    background: var(--surface2); border: 1px solid var(--border-light); border-radius: 8px;
+    min-width: 260px; max-height: 320px; overflow-y: auto; padding: 6px 0;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .ms-dropdown.open { display: block; }
+  .ms-controls {
+    display: flex; gap: 8px; padding: 6px 10px 8px;
+    border-bottom: 1px solid var(--border); margin-bottom: 4px;
+  }
+  .ms-ctrl-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ms-ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ms-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer;
+    font-family: var(--mono); font-size: 11px; color: var(--text-muted); transition: background 0.1s;
+  }
+  .ms-item:hover { background: var(--surface3); color: var(--text); }
+  .ms-item input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; flex-shrink: 0; }
+  .ms-item.checked { color: var(--text); }
+
+  /* WIDER TABLE COLUMNS */
+  .wide-table { min-width: 1400px; }
+  .wide-table td, .wide-table th { min-width: 80px; }
+  .wide-table td input[type=text] { min-width: 120px; }
+  .wide-table td textarea { min-width: 160px; height: 48px; resize: vertical; }
+  .col-deal   { min-width: 160px; width: 160px; }
+  .col-acct   { min-width: 140px; width: 140px; }
+  .col-owner  { min-width: 110px; width: 110px; }
+  .col-mlg    { min-width: 110px; width: 110px; }
+  .col-status { min-width: 90px;  width: 90px;  }
+  .col-stage  { min-width: 170px; width: 170px; }
+  .col-month  { min-width: 80px;  width: 80px;  }
+  .col-bucket { min-width: 90px;  width: 90px;  }
+  .col-prob   { min-width: 60px;  width: 60px;  }
+  .col-acv    { min-width: 100px; width: 100px; }
+  .col-sc     { min-width: 100px; width: 100px; }
+  .col-wtd    { min-width: 100px; width: 100px; }
+  .col-champ  { min-width: 120px; width: 120px; }
+  .col-date   { min-width: 110px; width: 110px; }
+  .col-notes  { min-width: 180px; width: 200px; }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
@@ -308,13 +365,17 @@
     <select class="filter-select" id="dealMonthFilter" onchange="renderDeals()">
       <option value="">All Close Months</option>
     </select>
-    <select class="filter-select" id="dealStageFilter" onchange="renderDeals()">
-      <option value="">All Stages</option>
-    </select>
+<div id="dealStageFilter"></div>
   </div>
 
   <div class="table-wrap">
-    <table id="dealTable">
+    <table id="dealTable" class="wide-table">
+      <colgroup>
+        <col class="col-deal"><col class="col-acct"><col class="col-owner"><col class="col-mlg">
+        <col class="col-status"><col class="col-stage"><col class="col-month"><col class="col-bucket">
+        <col class="col-prob"><col class="col-acv"><col class="col-sc"><col class="col-wtd">
+        <col class="col-champ"><col class="col-date"><col class="col-notes"><col class="col-notes"><col style="width:36px">
+      </colgroup>
       <thead>
         <tr>
           <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th>
@@ -344,9 +405,7 @@
     <select class="filter-select" id="fcMLGFilter" onchange="renderForecast()">
       <option value="">All MLG Reps</option>
     </select>
-    <select class="filter-select" id="fcStageFilter" onchange="renderForecast()">
-      <option value="">All Stages</option>
-    </select>
+<div id="fcStageFilter"></div>
   </div>
 
   <div id="forecastKPIs" class="kpi-row"></div>
@@ -390,9 +449,7 @@
     <select class="filter-select" id="wnRepFilter" onchange="renderWeeklyNotes()">
       <option value="">All MLG Reps</option>
     </select>
-    <select class="filter-select" id="wnStageFilter" onchange="renderWeeklyNotes()">
-      <option value="">All Stages</option>
-    </select>
+<div id="wnStageFilter"></div>
     <select class="filter-select" id="wnMonthFilter" onchange="renderWeeklyNotes()">
       <option value="">All Close Months</option>
     </select>
@@ -756,7 +813,6 @@ function renderDeals() {
   const ownerF = document.getElementById('dealOwnerFilter')?.value || '';
   const mlgF = document.getElementById('dealMLGFilter')?.value || '';
   const monthF = document.getElementById('dealMonthFilter')?.value || '';
-  const stageF = document.getElementById('dealStageFilter')?.value || '';
 
   // Populate MLG filter
   const mlgSel = document.getElementById('dealMLGFilter');
@@ -771,14 +827,7 @@ function renderDeals() {
     const cur = ownerSel.value;
     ownerSel.innerHTML = '<option value="">All Owners</option>' + owners.map(o => `<option value="${escHtml(o)}" ${o===cur?'selected':''}>${escHtml(o)}</option>`).join('');
   }
-  // Populate stage filter
-  const stageSel = document.getElementById('dealStageFilter');
-  if (stageSel) {
-    const cur = stageSel.value;
-    stageSel.innerHTML = '<option value="">All Stages</option>' + STAGES.map(s =>
-      `<option value="${escHtml(s)}" ${s===cur?'selected':''}>${escHtml(s)}</option>`
-    ).join('');
-  }
+  buildStageMultiSelect('dealStageFilter', 'renderDeals()');
   // Populate close month filter dynamically
   const monthSel = document.getElementById('dealMonthFilter');
   if (monthSel) {
@@ -800,7 +849,8 @@ function renderDeals() {
     if (ownerF && d.owner !== ownerF) return false;
     if (mlgF && d.mlgRep !== mlgF) return false;
     if (monthF && d.closeDate !== monthF) return false;
-    if (stageF && d.stage !== stageF) return false;
+    const stagesSel = getSelectedStages('dealStageFilter');
+    if (stagesSel && !stagesSel.includes(d.stage)) return false;
     if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -847,8 +897,8 @@ function renderDeals() {
       <td style="color:var(--purple)">${fmt$(wtdVal)}</td>
       <td><input type="text" data-field="champion" value="${escHtml(d.champion||'')}" onchange="schedSave()"></td>
       <td><input type="date" data-field="lastActivity" value="${d.lastActivity||''}" onchange="schedSave()"></td>
-      <td><textarea data-field="nextStep" rows="1" onchange="schedSave()">${escHtml(d.nextStep)}</textarea></td>
-      <td><textarea data-field="notes" rows="1" onchange="schedSave()">${escHtml(d.notes)}</textarea></td>
+      <td><textarea data-field="nextStep" rows="2" onchange="schedSave()">${escHtml(d.nextStep)}</textarea></td>
+      <td><textarea data-field="notes" rows="2" onchange="schedSave()">${escHtml(d.notes)}</textarea></td>
       <td><button class="delete-btn" onclick="deleteDeal(${d.id})" title="Delete">✕</button></td>
     </tr>`;
   }).join('');
@@ -873,7 +923,6 @@ function renderForecast() {
   const months = Q_MONTHS[currentQuarter];
   const [m1, m2, m3] = months.map(m => MONTH_NUMS[m]);
   const mlgF = document.getElementById('fcMLGFilter')?.value || '';
-  const stageF = document.getElementById('fcStageFilter')?.value || '';
 
   // Populate MLG filter
   const mlgSel = document.getElementById('fcMLGFilter');
@@ -883,14 +932,7 @@ function renderForecast() {
       `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`
     ).join('');
   }
-  // Populate stage filter
-  const stageSel = document.getElementById('fcStageFilter');
-  if (stageSel) {
-    const cur = stageSel.value;
-    stageSel.innerHTML = '<option value="">All Stages</option>' + STAGES.map(s =>
-      `<option value="${escHtml(s)}" ${s===cur?'selected':''}>${escHtml(s)}</option>`
-    ).join('');
-  }
+  buildStageMultiSelect('fcStageFilter', 'renderForecast()');
 
   const allQDeals = data.deals.filter(d => {
     const y = getYearFromDate(d.closeDate);
@@ -900,9 +942,10 @@ function renderForecast() {
     return yearOk && [m1, m2, m3].includes(mo);
   });
 
+  const fcStages = getSelectedStages('fcStageFilter');
   const deals = allQDeals.filter(d => {
     if (mlgF && d.mlgRep !== mlgF) return false;
-    if (stageF && d.stage !== stageF) return false;
+    if (fcStages && !fcStages.includes(d.stage)) return false;
     return true;
   });
 
@@ -1143,15 +1186,13 @@ function renderWeeklyNotes() {
   // Populate filters
   const repSel = document.getElementById('wnRepFilter');
   if (repSel) { const cur=repSel.value; repSel.innerHTML='<option value="">All MLG Reps</option>'+MLG_REPS.map(r=>`<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`).join(''); }
-  const stageSel = document.getElementById('wnStageFilter');
-  if (stageSel) { const cur=stageSel.value; stageSel.innerHTML='<option value="">All Stages</option>'+STAGES.map(s=>`<option value="${escHtml(s)}" ${s===cur?'selected':''}>${escHtml(s)}</option>`).join(''); }
+  buildStageMultiSelect('wnStageFilter', 'renderWeeklyNotes()');
   const monthSel = document.getElementById('wnMonthFilter');
   if (monthSel) { const cur=monthSel.value; const months=[...new Set(data.deals.map(d=>d.closeDate).filter(Boolean))].sort(); monthSel.innerHTML='<option value="">All Close Months</option>'+months.map(m=>`<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(fmtCloseMonth(m))}</option>`).join(''); }
 
   // Get filter values
   const search = (document.getElementById('wnSearch')?.value||'').toLowerCase();
   const repF   = document.getElementById('wnRepFilter')?.value||'';
-  const stageF = document.getElementById('wnStageFilter')?.value||'';
   const monthF = document.getElementById('wnMonthFilter')?.value||'';
   const progF  = document.getElementById('wnProgFilter')?.value||'';
 
@@ -1163,7 +1204,8 @@ function renderWeeklyNotes() {
   let deals = data.deals.filter(d => {
     if (d.status === 'Not Live' && !curNotes[d.id]) return false;
     if (repF   && d.mlgRep !== repF) return false;
-    if (stageF && d.stage !== stageF) return false;
+    const wnStages = getSelectedStages('wnStageFilter');
+    if (wnStages && !wnStages.includes(d.stage)) return false;
     if (monthF && d.closeDate !== monthF) return false;
     if (progF) { const n=curNotes[d.id]||{}; if (n.prog !== progF) return false; }
     if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
@@ -1484,7 +1526,6 @@ function renderSellerCredit() {
   const search = (document.getElementById('scSearch')?.value || '').toLowerCase();
   const mlgF = document.getElementById('scMLGFilter')?.value || '';
   const monthF = document.getElementById('scMonthFilter')?.value || '';
-  const stageF = document.getElementById('scStageFilter')?.value || '';
 
   const mlgSel = document.getElementById('scMLGFilter');
   if (mlgSel) {
@@ -1497,16 +1538,14 @@ function renderSellerCredit() {
     const months = [...new Set(data.deals.map(d => d.closeDate).filter(Boolean))].sort();
     monthSel.innerHTML = '<option value="">All Close Months</option>' + months.map(m => `<option value="${escHtml(m)}" ${m===cur?'selected':''}>${escHtml(fmtCloseMonth(m))}</option>`).join('');
   }
-  const stageSel = document.getElementById('scStageFilter');
-  if (stageSel) {
-    const cur = stageSel.value;
-    stageSel.innerHTML = '<option value="">All Stages</option>' + STAGES.map(s => `<option value="${escHtml(s)}" ${s===cur?'selected':''}>${escHtml(s)}</option>`).join('');
-  }
+  buildStageMultiSelect('scStageFilter', 'renderSellerCredit()');
 
+  const scStages = getSelectedStages('scStageFilter');
   let filtered = data.deals.filter(d => {
     if (mlgF && d.mlgRep !== mlgF) return false;
     if (monthF && d.closeDate !== monthF) return false;
-    if (stageF && d.stage !== stageF) return false;
+    const stagesSel = getSelectedStages('dealStageFilter');
+    if (stagesSel && !stagesSel.includes(d.stage)) return false;
     if (search && !`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -1576,6 +1615,74 @@ function renderSellerCredit() {
     <td></td>
     <td style="color:var(--purple)">${fmt$(totalWtdSC)}</td>
   </tr>`;
+}
+
+
+// ===== MULTI-SELECT STAGE FILTER =====
+function buildStageMultiSelect(containerId, onChange) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="ms-wrap" id="${containerId}_wrap">
+      <button class="ms-btn" id="${containerId}_btn" onclick="toggleMS('${containerId}')">All Stages</button>
+      <div class="ms-dropdown" id="${containerId}_dd">
+        <div class="ms-controls">
+          <button class="ms-ctrl-btn" onclick="selectAllMS('${containerId}',true)">Select All</button>
+          <button class="ms-ctrl-btn" onclick="selectAllMS('${containerId}',false)">Clear All</button>
+        </div>
+        ${STAGES.map((s,i) => `
+          <label class="ms-item" id="${containerId}_item_${i}">
+            <input type="checkbox" value="${s.replace(/"/g,'&quot;')}" checked
+              onchange="updateMSLabel('${containerId}');${onChange}">
+            ${s}
+          </label>`).join('')}
+      </div>
+    </div>`;
+  // Close on outside click
+  document.addEventListener('click', e => {
+    const wrap2 = document.getElementById(containerId + '_wrap');
+    if (wrap2 && !wrap2.contains(e.target)) {
+      document.getElementById(containerId + '_dd')?.classList.remove('open');
+    }
+  }, true);
+}
+
+function toggleMS(id) {
+  const dd = document.getElementById(id + '_dd');
+  dd?.classList.toggle('open');
+}
+
+function selectAllMS(id, checked) {
+  document.querySelectorAll(`#${id}_dd input[type=checkbox]`).forEach(cb => cb.checked = checked);
+  updateMSLabel(id);
+}
+
+function updateMSLabel(id) {
+  const checks = [...document.querySelectorAll(`#${id}_dd input[type=checkbox]`)];
+  const selected = checks.filter(c => c.checked);
+  const btn = document.getElementById(id + '_btn');
+  if (!btn) return;
+  if (selected.length === 0) {
+    btn.textContent = 'No Stages';
+    btn.classList.add('active');
+  } else if (selected.length === checks.length) {
+    btn.textContent = 'All Stages';
+    btn.classList.remove('active');
+  } else {
+    btn.textContent = `${selected.length} Stage${selected.length>1?'s':''} Selected`;
+    btn.classList.add('active');
+  }
+  // Update item styling
+  checks.forEach(cb => {
+    cb.closest('.ms-item')?.classList.toggle('checked', cb.checked);
+  });
+}
+
+function getSelectedStages(id) {
+  const checks = [...document.querySelectorAll(`#${id}_dd input[type=checkbox]`)];
+  if (!checks.length) return null; // not built yet — no filter
+  const selected = checks.filter(c => c.checked).map(c => c.value);
+  return selected.length === checks.length ? null : selected; // null = all selected = no filter
 }
 
 // ===== FIREBASE REAL-TIME INIT =====
@@ -1674,9 +1781,7 @@ if (daysLeft <= 7 && daysLeft > 0) {
     <select class="filter-select" id="scMonthFilter" onchange="renderSellerCredit()">
       <option value="">All Close Months</option>
     </select>
-    <select class="filter-select" id="scStageFilter" onchange="renderSellerCredit()">
-      <option value="">All Stages</option>
-    </select>
+<div id="scStageFilter"></div>
   </div>
 
   <div class="kpi-row" id="scKPIs"></div>
