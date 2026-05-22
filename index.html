@@ -554,7 +554,7 @@ const STAGES = ['Stage 0- Unique Meeting Set','Stage 1- Unique Meeting Run','Sta
 const STATUSES = ['Active','Stalled','Not Live'];
 const FORECAST_BUCKETS = ['Commit','Best Case','Pipeline','Upside'];
 const PROG_OPTIONS = ['↑ Progressed','→ Flat','↓ Regressed','✅ Closed Won','❌ Closed Lost'];
-const MLG_REPS = ['Adam Kloskey','James Laux','Luke Manning','Audra Borger','Michael Asmondy'];
+const MLG_REPS = ['Adam Kloskey','James Laux','Luke Manning','Audra Borger','Michael Asmondy','Blank'];
 // Annual quotas per rep (from quota sheet)
 const QUOTAS = {
   'Audra Borger':    { Q1: 37500,  Q2: 206520, Q3: 225000, Q4: 225000, annual: 694020 },
@@ -759,7 +759,7 @@ function showPanel(name) {
 // ===== DEAL TRACKER =====
 function addDeal() {
   setEditing();
-  // Pre-fill mlgRep from the active filter so the new deal shows up immediately
+  // Read active rep filter to pre-fill mlgRep
   const mlgReps2 = getSelectedMS('dealMLGFilter');
   const mlgFVal = (mlgReps2 && mlgReps2.length === 1) ? mlgReps2[0] : '';
   data.deals.push({
@@ -767,7 +767,23 @@ function addDeal() {
     stage:'Stage 0- Unique Meeting Set', closeDate:'', forecastBucket:'Pipeline',
     prob:0, acv:0, sellerCredit:0, champion:'', lastActivity:'', nextStep:'', notes:''
   });
-  renderDeals(); schedSave();
+  // Clear all filters so the new blank row is visible
+  clearDealFilters();
+  renderDeals();
+  schedSave();
+}
+
+function clearDealFilters() {
+  // Reset search
+  const s = document.getElementById('dealSearch'); if (s) s.value = '';
+  // Reset owner filter
+  const o = document.getElementById('dealOwnerFilter'); if (o) o.value = '';
+  const sf = document.getElementById('dealStatusFilter'); if (sf) sf.value = '';
+  // Reset all multi-selects by removing them so they rebuild as "all selected"
+  ['dealMLGFilter','dealMonthFilter','dealStageFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
 }
 
 function deleteDeal(id) {
@@ -968,7 +984,7 @@ function renderForecast() {
 
   // Per-rep pipeline scorecards
   const repCards = document.getElementById('forecastRepCards');
-  repCards.innerHTML = MLG_REPS.map(rep => {
+  repCards.innerHTML = MLG_REPS.filter(rep => rep !== 'Blank').map(rep => {
     const repDeals = allQDeals.filter(d => d.mlgRep === rep);
     // Only Active deals count toward pipeline viability (excludes Stalled, Not Live, Closed Lost)
     const repPipe = repDeals.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost'&&d.status==='Active').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
