@@ -235,6 +235,77 @@
   .col-date   { min-width: 110px; width: 110px; }
   .col-notes  { min-width: 180px; width: 200px; }
 
+/* Comma-formatted inputs */
+  input.comma-num { color: var(--text); }
+  input[data-field="acv"] { color: var(--text); }
+  input[data-field="sellerCredit"] { color: var(--purple); font-weight: 500; }
+
+  @media print {
+    body > *:not(#printArea) { display: none !important; }
+    #printArea { display: block !important; }
+    .topbar, .nav-tabs, .add-row-btn, .delete-btn, .print-btn, .no-print { display: none !important; }
+    .rep-card { break-inside: avoid; border: 1px solid #ccc !important; }
+    body { background: white !important; color: black !important; }
+    table { color: black !important; }
+    th, td { color: black !important; border-color: #ccc !important; }
+  }
+  #printArea { display: none; }
+
+  /* REP CARD STYLES */
+  .rep-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    margin-bottom: 20px; overflow: hidden;
+  }
+  .rep-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .rep-card-name { font-family: var(--sans); font-weight: 800; font-size: 16px; }
+  .rep-card-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .rep-card-body { padding: 16px 18px; }
+  .rep-section-label {
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 8px; margin-top: 14px; font-weight: 600;
+  }
+  .rep-section-label:first-child { margin-top: 0; }
+  .print-btn {
+    background: var(--surface3); border: 1px solid var(--border-light); color: var(--text-muted);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: var(--mono);
+    font-size: 11px; transition: all 0.15s; display: flex; align-items: center; gap: 5px;
+  }
+  .print-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .deal-note-row {
+    display: grid; grid-template-columns: 180px 80px 1fr 1fr;
+    gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: start;
+    font-size: 12px;
+  }
+  .deal-note-row:last-child { border-bottom: none; }
+  .deal-note-name { color: var(--accent); font-weight: 500; }
+  .prog-pill {
+    display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  }
+  .prog-up   { background: var(--green-bg);  color: var(--green); }
+  .prog-down { background: var(--red-bg);    color: var(--red); }
+  .prog-flat { background: var(--surface3);  color: var(--text-muted); }
+  .action-item-row {
+    display: grid; grid-template-columns: 120px 1fr 110px 100px 28px;
+    gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); align-items: start;
+  }
+  .action-item-row:last-child { border-bottom: none; }
+  .action-item-row input, .action-item-row select, .action-item-row textarea {
+    background: var(--surface3); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--mono); font-size: 11px; padding: 4px 7px; border-radius: 5px;
+    outline: none; width: 100%;
+  }
+  .action-item-row input:focus, .action-item-row select:focus { border-color: var(--accent); }
+  .add-action-btn {
+    background: none; border: 1px dashed var(--border-light); color: var(--text-muted);
+    padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: var(--mono);
+    font-size: 11px; margin-top: 8px; transition: all 0.15s;
+  }
+  .add-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
@@ -351,12 +422,7 @@
 
   <div class="section-toolbar">
     <input class="search-input" id="dealSearch" placeholder="🔍 Search deals..." oninput="renderDeals()">
-    <select class="filter-select" id="dealStatusFilter" onchange="renderDeals()">
-      <option value="">All Statuses</option>
-      <option value="Active">🟢 Active</option>
-      <option value="Stalled">🟡 Stalled</option>
-      <option value="Not Live">🔴 Not Live</option>
-    </select>
+    <div id="dealStatusFilter"></div>
     <div id="dealMLGFilter"></div>
     <select class="filter-select" id="dealOwnerFilter" onchange="renderDeals()">
       <option value="">All Owners</option>
@@ -370,14 +436,14 @@
       <colgroup>
         <col class="col-deal"><col class="col-acct"><col class="col-owner"><col class="col-mlg">
         <col class="col-status"><col class="col-stage"><col class="col-month"><col class="col-bucket">
-        <col class="col-prob"><col class="col-acv"><col class="col-sc"><col class="col-wtd">
-        <col class="col-champ"><col class="col-date"><col class="col-notes"><col class="col-notes"><col style="width:36px">
+        <col class="col-prob"><col class="col-acv"><col class="col-sc">
+        <col class="col-champ"><col class="col-notes"><col class="col-notes"><col style="width:36px">
       </colgroup>
       <thead>
         <tr>
           <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th>
           <th>Close Month</th><th>Forecast Bucket</th><th>Prob %</th><th>Net ACV ($)</th><th>MLG Seller Credit ($)</th>
-          <th>Wtd Value ($)</th><th>Champion</th><th>Last Activity</th><th>Next Step</th><th>Notes</th><th></th>
+          <th>Champion</th><th>Next Step</th><th>Notes</th><th></th>
         </tr>
       </thead>
       <tbody id="dealTbody"></tbody>
@@ -401,6 +467,7 @@
 
     <div id="fcMLGFilter"></div>
     <div id="fcStageFilter"></div>
+    <div id="fcStatusFilter"></div>
   </div>
 
   <div id="forecastKPIs" class="kpi-row"></div>
@@ -443,6 +510,7 @@
     <input class="search-input" id="wnSearch" placeholder="🔍 Search deals..." oninput="renderWeeklyNotes()">
     <div id="wnRepFilter"></div>
     <div id="wnStageFilter"></div>
+    <div id="wnStatusFilter"></div>
     <div id="wnMonthFilter"></div>
     <select class="filter-select" id="wnProgFilter" onchange="renderWeeklyNotes()">
       <option value="">All Progression</option>
@@ -456,7 +524,7 @@
     <table id="weeklyNotesTable">
       <thead>
         <tr>
-          <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th><th>Close Month</th>
+          <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th><th>Close Month</th><th>Net ACV ($)</th>
           <th>Progression ↑↓→</th><th>Weekly Notes</th><th>Blockers / Risks</th>
           <th>Action Items</th><th>Action Owner</th><th>Due Date</th>
           <th>Forecast Impact ($)</th><th>Manager Comments</th>
@@ -481,38 +549,39 @@
 
 <!-- ===== WEEKLY SUMMARY ===== -->
 <div class="panel" id="panel-weeklysummary">
-  <div class="section-header">📈 Weekly Deal Progression Summary Dashboard</div>
-  <div class="section-sub">Update "Week Of" date each Monday. Populate top deals and action items below.</div>
+  <div class="section-header">📈 Weekly 1:1 Summary</div>
+  <div class="section-sub">Per-rep coaching snapshots pulled from Weekly Notes. Add action items, then print each rep's card as a PDF to share.</div>
 
-  <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
-    <div style="font-size:11px; color:var(--text-muted)">📅 Week Of:</div>
-    <input class="week-of-input" id="summaryWeekOf" type="date" onchange="saveAll()">
+  <!-- Week controls -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;">
+    <div style="font-size:11px;color:var(--text-muted);font-weight:500">📅 Week Of:</div>
+    <input class="week-of-input" id="summaryWeekOf" type="date" onchange="changeSummaryWeek(this.value)">
+    <button onclick="syncSummaryToNotesWeek()" style="background:var(--accent-glow);border:1px solid rgba(79,142,247,0.3);color:var(--accent);padding:5px 12px;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11px">↑ Sync to Notes Week</button>
+    <select class="filter-select" id="summaryRepFilter" onchange="renderWeeklySummary()" style="min-width:130px">
+      <option value="">All Reps</option>
+    </select>
   </div>
 
+  <!-- Team KPIs -->
   <div class="week-kpi-grid" id="summaryKPIs"></div>
 
-  <div class="section-header" style="font-size:14px; margin-bottom:12px">🚀 Top Progressed Deals This Week</div>
-  <div class="section-sub">Manually updated each Monday.</div>
-  <div class="table-wrap">
-    <table id="topDealsTable">
-      <thead>
-        <tr><th>Deal Name</th><th>Account</th><th>Owner</th><th>Status</th><th>Progression</th><th>Key Notes / Update</th><th>Action Item</th><th>Due</th><th>Closed?</th><th>Notes</th><th></th></tr>
-      </thead>
-      <tbody id="topDealsTbody"></tbody>
-    </table>
-  </div>
-  <button class="add-row-btn" onclick="addTopDeal()">＋ Add Deal</button>
+  <!-- Rep Cards -->
+  <div id="repCardsContainer"></div>
 
-  <div class="section-header" style="font-size:14px; margin-top:24px; margin-bottom:12px">💡 Manager Action Items</div>
-  <div class="table-wrap">
-    <table id="managerActionsTable">
-      <thead>
-        <tr><th>Priority</th><th>Action Item</th><th>Deal / Account</th><th>Owner</th><th>Due Date</th><th>Status</th><th>Notes</th><th></th></tr>
-      </thead>
-      <tbody id="managerActionsTbody"></tbody>
-    </table>
+  <!-- Manager Action Items -->
+  <div style="margin-top:28px">
+    <div class="section-header" style="font-size:15px;margin-bottom:8px">💡 Manager Action Items</div>
+    <div class="section-sub">Manually tracked actions for follow-up beyond individual rep 1:1s.</div>
+    <div class="table-wrap">
+      <table id="managerActionsTable">
+        <thead>
+          <tr><th>Priority</th><th>Action Item</th><th>Deal / Account</th><th>Owner</th><th>Due Date</th><th>Status</th><th>Notes</th><th></th></tr>
+        </thead>
+        <tbody id="managerActionsTbody"></tbody>
+      </table>
+    </div>
+    <button class="add-row-btn" onclick="addManagerAction()">＋ Add Action</button>
   </div>
-  <button class="add-row-btn" onclick="addManagerAction()">＋ Add Action</button>
 </div>
 
 <!-- ===== MEDDPICC ===== -->
@@ -618,6 +687,7 @@ function loadData() {
   if (!data.weeklyNotes) data.weeklyNotes = {};
   if (!data.topDeals) data.topDeals = [];
   if (!data.managerActions) data.managerActions = [];
+  if (!data.repActions) data.repActions = {};
   if (!data.meddpicc) data.meddpicc = [];
   if (!data.forecastYear) data.forecastYear = 2026;
 }
@@ -626,7 +696,7 @@ function collectActive() {
   const activePanel = document.querySelector('.panel.active')?.id || '';
   if (activePanel === 'panel-dealtracker') collectDealData();
   collectWeeklyNotesData();
-  if (activePanel === 'panel-weeklysummary') { collectTopDeals(); collectManagerActions(); }
+  if (activePanel === 'panel-weeklysummary') { collectManagerActions(); }
   if (activePanel === 'panel-meddpicc') collectMeddpicc();
   data.weeklyNotesWeekOf = document.getElementById('weekOfDate')?.value || '';
   data.summaryWeekOf = document.getElementById('summaryWeekOf')?.value || '';
@@ -679,6 +749,14 @@ function inpMonth(val) {
   });
   return `<select data-field="closeDate" onchange="schedSave()" style="width:70px">${opts}</select>`;
 }
+
+function fmtNum(n) {
+  if (!n && n !== 0) return '';
+  const num = parseFloat(n);
+  if (isNaN(num) || num === 0) return '';
+  return num.toLocaleString('en-US');
+}
+function stripCommas(v) { return String(v||'').replace(/,/g, ''); }
 function fmtCloseMonth(v) {
   const MNAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   if (!v) return '—';
@@ -758,6 +836,21 @@ function showPanel(name) {
 }
 
 // ===== DEAL TRACKER =====
+// Auto-sync seller credit with Net ACV unless user has manually changed it
+function syncSellerCredit(acvInput, dealId) {
+  const deal = data.deals.find(d => d.id === dealId);
+  if (!deal) return;
+  const newAcv = parseFloat(acvInput.value) || 0;
+  const scInput = document.getElementById('sc_' + dealId);
+  if (!scInput) return;
+  const currentSC = parseFloat(scInput.value) || 0;
+  const oldAcv = parseFloat(deal.acv) || 0;
+  // Only auto-sync if seller credit currently equals the OLD acv (user hasn't customised it)
+  if (currentSC === oldAcv || currentSC === 0) {
+    scInput.value = newAcv || '';
+  }
+}
+
 function addDeal() {
   setEditing();
   // Read active rep filter to pre-fill mlgRep
@@ -781,7 +874,7 @@ function clearDealFilters() {
   const o = document.getElementById('dealOwnerFilter'); if (o) o.value = '';
   const sf = document.getElementById('dealStatusFilter'); if (sf) sf.value = '';
   // Reset all multi-selects by removing them so they rebuild as "all selected"
-  ['dealMLGFilter','dealMonthFilter','dealStageFilter'].forEach(id => {
+  ['dealMLGFilter','dealMonthFilter','dealStageFilter','dealStatusFilter'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '';
   });
@@ -802,22 +895,24 @@ function collectDealData() {
     row.querySelectorAll('[data-field]').forEach(el => {
       const f = el.dataset.field;
       if (f === 'prob' || f === 'acv' || f === 'sellerCredit') {
-        deal[f] = parseFloat(el.value) || 0;
+        deal[f] = parseFloat(String(el.value).replace(/,/g,'')) || 0;
       } else {
         deal[f] = el.value || '';
       }
     });
+    // If sellerCredit is 0/blank and acv is set, default sellerCredit to acv
+    if (!deal.sellerCredit && deal.acv) deal.sellerCredit = deal.acv;
   });
 }
 
 function renderDeals() {
   collectDealData();
   const search = (document.getElementById('dealSearch')?.value || '').toLowerCase();
-  const statusF = document.getElementById('dealStatusFilter')?.value || '';
   const ownerF = document.getElementById('dealOwnerFilter')?.value || '';
   buildRepMultiSelect('dealMLGFilter', 'renderDeals()');
   buildMonthMultiSelect('dealMonthFilter', 'renderDeals()');
   buildStageMultiSelect('dealStageFilter', 'renderDeals()');
+  buildStatusMultiSelect('dealStatusFilter', 'renderDeals()');
 
   // Populate owner filter
   const owners = [...new Set(data.deals.map(d => d.owner).filter(Boolean))];
@@ -828,10 +923,11 @@ function renderDeals() {
   }
 
   let filtered = data.deals.filter(d => {
-    if (statusF && d.status !== statusF) return false;
     if (ownerF && d.owner !== ownerF) return false;
     const stagesSel = getSelectedMS('dealStageFilter');
     if (stagesSel && !stagesSel.includes(d.stage)) return false;
+    const statusSel = getSelectedMS('dealStatusFilter');
+    if (statusSel && !statusSel.includes(d.status)) return false;
     const mlgSel2 = getSelectedMS('dealMLGFilter');
     if (mlgSel2 && !mlgSel2.includes(d.mlgRep)) return false;
     const monthSel2 = getSelectedMS('dealMonthFilter');
@@ -849,7 +945,6 @@ function renderDeals() {
   const notlive = filtered.filter(d => d.status === 'Not Live').length;
   const closedWon = filtered.filter(d => d.stage === 'Closed Won').reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
   const pipeline = filtered.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
-  const wtd = filtered.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').reduce((s, d) => s + (parseFloat(d.acv)||0) * (parseFloat(d.prob)||0) / 100, 0);
   const selMonths = getSelectedMS('dealMonthFilter');
   const filterLabel = (selMonths && selMonths.length === 1) ? ` — ${fmtCloseMonth(selMonths[0])}` : '';
   document.getElementById('dealKPIs').innerHTML = `
@@ -861,7 +956,6 @@ function renderDeals() {
       <div class="kpi-value green">${fmt$(closedWon)}</div>
     </div>
     <div class="kpi-card"><div class="kpi-label">Pipeline${filterLabel}</div><div class="kpi-value accent">${fmt$(pipeline)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Weighted Pipeline${filterLabel}</div><div class="kpi-value">${fmt$(wtd)}</div></div>
     <div class="kpi-card" style="border-color:rgba(167,139,250,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(167,139,250,0.07) 100%)">
       <div class="kpi-label" style="color:var(--purple)">💰 Seller Credit${filterLabel}</div>
       <div class="kpi-value" style="color:var(--purple)">${fmt$(filtered.reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0))}</div>
@@ -870,7 +964,6 @@ function renderDeals() {
 
   const tbody = document.getElementById('dealTbody');
   tbody.innerHTML = filtered.map(d => {
-    const wtdVal = (parseFloat(d.acv)||0) * (parseFloat(d.prob)||0) / 100;
     return `<tr data-id="${d.id}" class="${statusRowClass(d.status)}">
       <td><input type="text" data-field="name" value="${escHtml(d.name||'')}" onchange="schedSave()"></td>
       <td><input type="text" data-field="account" value="${escHtml(d.account||'')}" onchange="schedSave()"></td>
@@ -881,11 +974,9 @@ function renderDeals() {
       <td>${inpMonth(d.closeDate)}</td>
       <td><select data-field="forecastBucket" onchange="schedSave()">${selOpts(FORECAST_BUCKETS, d.forecastBucket)}</select></td>
       <td><input type="number" data-field="prob" value="${d.prob||''}" min="0" max="100" style="width:55px" onchange="schedSave()">%</td>
-      <td><input type="number" data-field="acv" value="${d.acv||''}" style="width:90px" onchange="schedSave()"></td>
-      <td><input type="number" data-field="sellerCredit" value="${d.sellerCredit||''}" style="width:90px" onchange="schedSave()" placeholder="0"></td>
-      <td style="color:var(--purple)">${fmt$(wtdVal)}</td>
+      <td><input type="text" data-field="acv" value="${fmtNum(d.acv)}" style="width:100px" onchange="syncSellerCredit(this,${d.id});schedSave()" onfocus="this.value=stripCommas(this.value)" onblur="this.value=fmtNum(parseFloat(stripCommas(this.value))||0)"></td>
+      <td><input type="text" data-field="sellerCredit" id="sc_${d.id}" value="${fmtNum(d.sellerCredit||d.acv||0)}" style="width:100px;color:var(--purple);font-weight:500" onchange="schedSave()" onfocus="this.value=stripCommas(this.value)" onblur="this.value=fmtNum(parseFloat(stripCommas(this.value))||0)" placeholder="= Net ACV"></td>
       <td><input type="text" data-field="champion" value="${escHtml(d.champion||'')}" onchange="schedSave()"></td>
-      <td><input type="date" data-field="lastActivity" value="${d.lastActivity||''}" onchange="schedSave()"></td>
       <td><textarea data-field="nextStep" rows="2" onchange="schedSave()">${escHtml(d.nextStep)}</textarea></td>
       <td><textarea data-field="notes" rows="2" onchange="schedSave()">${escHtml(d.notes)}</textarea></td>
       <td><button class="delete-btn" onclick="deleteDeal(${d.id})" title="Delete">✕</button></td>
@@ -913,6 +1004,7 @@ function renderForecast() {
   const [m1, m2, m3] = months.map(m => MONTH_NUMS[m]);
   buildRepMultiSelect('fcMLGFilter', 'renderForecast()');
   buildStageMultiSelect('fcStageFilter', 'renderForecast()');
+  buildStatusMultiSelect('fcStatusFilter', 'renderForecast()');
 
   const allQDeals = data.deals.filter(d => {
     const y = getYearFromDate(d.closeDate);
@@ -924,9 +1016,11 @@ function renderForecast() {
 
   const fcStages = getSelectedMS('fcStageFilter');
   const fcReps = getSelectedMS('fcMLGFilter');
+  const fcStatus = getSelectedMS('fcStatusFilter');
   const deals = allQDeals.filter(d => {
     if (fcReps && !fcReps.includes(d.mlgRep)) return false;
     if (fcStages && !fcStages.includes(d.stage)) return false;
+    if (fcStatus && !fcStatus.includes(d.status)) return false;
     return true;
   });
 
@@ -935,20 +1029,18 @@ function renderForecast() {
     <th>MLG Rep</th><th>Deal Name</th><th>Account</th><th>Owner</th><th>Status</th><th>Stage</th>
     <th>Close Month</th><th>Prob %</th><th>Net ACV ($)</th>
     <th class="month-val">${months[0]} ($)</th><th class="month-val">${months[1]} ($)</th><th class="month-val">${months[2]} ($)</th>
-    <th>${currentQuarter} Total ($)</th><th class="wtd-val">Wtd Value ($)</th>
-    <th style="color:var(--purple)">Seller Credit ($)</th>
+    <th>${currentQuarter} Total ($)</th><th style="color:var(--purple)">Seller Credit ($)</th>
     <th>Champion</th><th>Next Step</th>
   </tr>`;
 
-  let totals = {m1:0, m2:0, m3:0, total:0, wtd:0, sc:0};
+let totals = {m1:0, m2:0, m3:0, total:0, sc:0};
   const tbody = document.getElementById('forecastTbody');
   tbody.innerHTML = deals.map(d => {
     const mo = getMonthFromDate(d.closeDate);
     const acv = parseFloat(d.acv) || 0;
     const sc = parseFloat(d.sellerCredit) || 0;
     const v1 = mo === m1 ? acv : 0, v2 = mo === m2 ? acv : 0, v3 = mo === m3 ? acv : 0;
-    const wtd = acv * (parseFloat(d.prob)||0) / 100;
-    totals.m1 += v1; totals.m2 += v2; totals.m3 += v3; totals.total += acv; totals.wtd += wtd; totals.sc += sc;
+    totals.m1 += v1; totals.m2 += v2; totals.m3 += v3; totals.total += acv; totals.sc += sc;
     return `<tr class="${statusRowClass(d.status)}">
       <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.mlgRep||'')}</td>
       <td style="font-weight:500">${escHtml(d.name)}</td><td>${escHtml(d.account)}</td><td>${escHtml(d.owner)}</td>
@@ -957,14 +1049,14 @@ function renderForecast() {
       <td class="month-val">${v1 ? fmt$(v1) : '—'}</td>
       <td class="month-val">${v2 ? fmt$(v2) : '—'}</td>
       <td class="month-val">${v3 ? fmt$(v3) : '—'}</td>
-      <td>${fmt$(acv)}</td><td class="wtd-val">${fmt$(wtd)}</td>
+      <td>${fmt$(acv)}</td>
       <td style="color:var(--purple);font-weight:500">${sc ? fmt$(sc) : '—'}</td>
       <td style="font-size:11px">${escHtml(d.champion)}</td><td style="font-size:11px;color:var(--text-muted)">${escHtml(d.nextStep)}</td>
     </tr>`;
   }).join('') + `<tr style="background:var(--surface2);font-weight:600;border-top:2px solid var(--border-light)">
     <td colspan="9" style="color:var(--text-muted);font-size:11px;text-transform:uppercase">Totals (${deals.length} deals)</td>
     <td class="month-val">${fmt$(totals.m1)}</td><td class="month-val">${fmt$(totals.m2)}</td><td class="month-val">${fmt$(totals.m3)}</td>
-    <td>${fmt$(totals.total)}</td><td class="wtd-val">${fmt$(totals.wtd)}</td>
+    <td>${fmt$(totals.total)}</td>
     <td style="color:var(--purple)">${fmt$(totals.sc)}</td>
     <td colspan="2"></td>
   </tr>`;
@@ -976,7 +1068,6 @@ function renderForecast() {
     <div class="kpi-card"><div class="kpi-label">${months[1]}</div><div class="kpi-value">${fmt$(totals.m2)}</div></div>
     <div class="kpi-card"><div class="kpi-label">${months[2]}</div><div class="kpi-value">${fmt$(totals.m3)}</div></div>
     <div class="kpi-card"><div class="kpi-label">${currentQuarter} Total Pipeline</div><div class="kpi-value green">${fmt$(totals.total)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Wtd Pipeline</div><div class="kpi-value" style="color:var(--purple)">${fmt$(totals.wtd)}</div></div>
     <div class="kpi-card" style="border-color:rgba(167,139,250,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(167,139,250,0.07) 100%)">
       <div class="kpi-label" style="color:var(--purple)">💰 Seller Credit</div>
       <div class="kpi-value" style="color:var(--purple)">${fmt$(totals.sc)}</div>
@@ -985,7 +1076,9 @@ function renderForecast() {
 
   // Per-rep pipeline scorecards
   const repCards = document.getElementById('forecastRepCards');
-  repCards.innerHTML = MLG_REPS.filter(rep => rep !== 'Blank').map(rep => {
+  const fcRepsFilter = getSelectedMS('fcMLGFilter');
+  const repsToShow = MLG_REPS.filter(rep => rep !== 'Blank' && (!fcRepsFilter || fcRepsFilter.includes(rep)));
+  repCards.innerHTML = repsToShow.map(rep => {
     const repDeals = allQDeals.filter(d => d.mlgRep === rep);
     // Only Active deals count toward pipeline viability (excludes Stalled, Not Live, Closed Lost)
     const repPipe = repDeals.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost'&&d.status==='Active').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
@@ -1167,6 +1260,7 @@ function renderWeeklyNotes() {
   // Populate filters
   buildRepMultiSelect('wnRepFilter', 'renderWeeklyNotes()');
   buildStageMultiSelect('wnStageFilter', 'renderWeeklyNotes()');
+  buildStatusMultiSelect('wnStatusFilter', 'renderWeeklyNotes()');
   buildMonthMultiSelect('wnMonthFilter', 'renderWeeklyNotes()');
 
   // Get filter values
@@ -1184,6 +1278,8 @@ function renderWeeklyNotes() {
     if (wnReps && !wnReps.includes(d.mlgRep)) return false;
     const wnStages = getSelectedMS('wnStageFilter');
     if (wnStages && !wnStages.includes(d.stage)) return false;
+    const wnStatus = getSelectedMS('wnStatusFilter');
+    if (wnStatus && !wnStatus.includes(d.status)) return false;
     const wnMonths = getSelectedMS('wnMonthFilter');
     if (wnMonths) {
       const mm = (d.closeDate||'').replace(/^\d{4}-/,'').replace(/^0*/,'').padStart(2,'0');
@@ -1223,6 +1319,7 @@ function renderWeeklyNotes() {
       <td>${statusBadge(d.status)}</td>
       <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.stage)}</td>
       <td style="font-size:11px;color:var(--text-muted)">${fmtCloseMonth(d.closeDate)}</td>
+      <td style="color:var(--text);font-weight:500">${fmtNum(d.acv)}</td>
       <td><select class="prog-select" data-field="prog" onchange="schedSave()">${selOpts(PROG_OPTIONS, n.prog)}</select></td>
       <td><textarea rows="2" data-field="weeklyNote" onchange="schedSave()">${escHtml(n.weeklyNote||'')}</textarea></td>
       <td><textarea rows="2" data-field="blockers" onchange="schedSave()">${escHtml(n.blockers||'')}</textarea></td>
@@ -1274,30 +1371,30 @@ function updateMeddpiccField(dealId, field, value) {
 }
 
 // ===== WEEKLY SUMMARY =====
-function collectTopDeals() {
-  const tbody = document.getElementById('topDealsTbody');
-  if (!tbody) return;
-  data.topDeals = [];
-  tbody.querySelectorAll('tr[data-idx]').forEach((row, i) => {
-    const inputs = row.querySelectorAll('input, select, textarea');
-    data.topDeals.push({
-      name: inputs[0]?.value || '', account: inputs[1]?.value || '',
-      owner: inputs[2]?.value || '', status: inputs[3]?.value || '',
-      prog: inputs[4]?.value || '', keyNotes: inputs[5]?.value || '',
-      actionItem: inputs[6]?.value || '', due: inputs[7]?.value || '',
-      closed: inputs[8]?.value || '', notes: inputs[9]?.value || ''
-    });
-  });
+// ===== WEEKLY SUMMARY =====
+
+function changeSummaryWeek(val) {
+  data.summaryWeekOf = val;
+  saveAll();
+  renderWeeklySummary();
 }
 
-function addTopDeal() {
-  data.topDeals.push({name:'',account:'',owner:'',status:'Active',prog:'→ Flat',keyNotes:'',actionItem:'',due:'',closed:'No',notes:''});
-  renderWeeklySummary(); schedSave();
+function syncSummaryToNotesWeek() {
+  const wk = currentWeekKey || getMondayOf(new Date().toISOString().slice(0,10));
+  const el = document.getElementById('summaryWeekOf');
+  if (el) el.value = wk;
+  data.summaryWeekOf = wk;
+  saveAll();
+  renderWeeklySummary();
 }
+
+function collectTopDeals() {} // no longer used — actions stored per-rep in data.repActions
+function addTopDeal() {}
 
 function collectManagerActions() {
   const tbody = document.getElementById('managerActionsTbody');
   if (!tbody) return;
+  if (!document.getElementById('panel-weeklysummary')?.classList.contains('active')) return;
   data.managerActions = [];
   tbody.querySelectorAll('tr[data-idx]').forEach(row => {
     const inputs = row.querySelectorAll('input, select, textarea');
@@ -1315,37 +1412,225 @@ function addManagerAction() {
   renderWeeklySummary(); schedSave();
 }
 
-function renderWeeklySummary() {
-  const summWk = document.getElementById('summaryWeekOf');
-  if (summWk && data.summaryWeekOf) summWk.value = data.summaryWeekOf;
+function addRepAction(rep, weekKey) {
+  if (!data.repActions) data.repActions = {};
+  if (!data.repActions[weekKey]) data.repActions[weekKey] = {};
+  if (!data.repActions[weekKey][rep]) data.repActions[weekKey][rep] = [];
+  data.repActions[weekKey][rep].push({deal:'', action:'', due:'', status:'Open'});
+  renderWeeklySummary(); schedSave();
+}
 
-  const active = data.deals.filter(d => d.status === 'Active').length;
-  const stalled = data.deals.filter(d => d.status === 'Stalled').length;
-  const notlive = data.deals.filter(d => d.status === 'Not Live').length;
-  const pipeline = data.deals.reduce((s, d) => s + (parseFloat(d.acv)||0), 0);
-  const progressed = (data.weeklyNotes ? Object.values(data.weeklyNotes).filter(n => n.prog === '↑ Progressed').length : 0);
+function collectRepActions(rep, weekKey) {
+  if (!data.repActions) data.repActions = {};
+  if (!data.repActions[weekKey]) data.repActions[weekKey] = {};
+  const container = document.getElementById(`repActions_${rep.replace(/\s+/g,'_')}_${weekKey}`);
+  if (!container) return;
+  data.repActions[weekKey][rep] = [];
+  container.querySelectorAll('.action-item-row[data-idx]').forEach(row => {
+    const selects = row.querySelectorAll('select');
+    const textarea = row.querySelector('textarea');
+    const dateInput = row.querySelector('input[type=date]');
+    data.repActions[weekKey][rep].push({
+      deal: selects[0]?.value || '',
+      action: textarea?.value || '',
+      due: dateInput?.value || '',
+      status: selects[1]?.value || 'Open'
+    });
+  });
+}
+
+function printRepCard(rep) {
+  const repId = rep.replace(/\s+/g,'_');
+  const weekKey = document.getElementById('summaryWeekOf')?.value || data.summaryWeekOf || '';
+  const weekNotes = (data.weeklyHistory||{})[weekKey] || {};
+  const repDeals = data.deals.filter(d => d.mlgRep === rep && d.status !== 'Not Live');
+  const repActions = ((data.repActions[weekKey]||{})[rep]) || [];
+  const dealsWithNotes = repDeals.filter(d => {
+    const n = weekNotes[d.id];
+    return n && (n.prog || n.weeklyNote || n.blockers || n.managerComment);
+  });
+
+  const progStyle = v => v==='↑ Progressed' ? 'color:#16a34a;font-weight:bold' : v==='↓ Regressed' ? 'color:#dc2626;font-weight:bold' : 'color:#888';
+  const statusBg = s => s==='Done' ? '#dcfce7' : s==='In Progress' ? '#fef9c3' : '#f3f4f6';
+
+  const printArea = document.getElementById('printArea') || (() => {
+    const d = document.createElement('div'); d.id='printArea'; document.body.appendChild(d); return d;
+  })();
+
+  const pipeline = repDeals.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+  const won = repDeals.filter(d=>d.stage==='Closed Won').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+
+  printArea.innerHTML = `
+    <div style="font-family:Arial,sans-serif;padding:28px;max-width:820px;margin:0 auto;color:#111">
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #333">
+        <div>
+          <h1 style="font-size:22px;margin:0;font-weight:800">${escHtml(rep)}</h1>
+          <div style="font-size:13px;color:#555;margin-top:4px">Weekly 1:1 — ${getWeekLabel(weekKey)}</div>
+          <div style="font-size:12px;color:#777;margin-top:4px">Pipeline: <strong>${fmt$(pipeline)}</strong> &nbsp;·&nbsp; Won: <strong>${fmt$(won)}</strong></div>
+        </div>
+        <div style="font-size:11px;color:#aaa;text-align:right">MLG Team Tracker<br>${new Date().toLocaleDateString()}</div>
+      </div>
+
+      <!-- Deal Notes -->
+      <div style="margin-bottom:20px">
+        <h2 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#444;margin-bottom:10px">📋 Deal Notes This Week</h2>
+        ${dealsWithNotes.length === 0
+          ? '<p style="color:#999;font-size:12px">No notes recorded this week.</p>'
+          : dealsWithNotes.map(d => {
+              const n = weekNotes[d.id] || {};
+              return `<div style="border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin-bottom:10px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                  <strong style="font-size:13px">${escHtml(d.account)}</strong>
+                  <span style="${progStyle(n.prog)};font-size:11px">${escHtml(n.prog||'')}</span>
+                </div>
+                ${n.weeklyNote ? `<p style="margin:4px 0;font-size:12px;color:#333">${escHtml(n.weeklyNote)}</p>` : ''}
+                ${n.blockers ? `<p style="margin:4px 0;font-size:11px;color:#dc2626">⚠ ${escHtml(n.blockers)}</p>` : ''}
+                ${n.managerComment ? `<p style="margin:6px 0 0;font-size:11px;color:#7c3aed;border-top:1px solid #e5e7eb;padding-top:6px">💬 ${escHtml(n.managerComment)}</p>` : ''}
+              </div>`;
+            }).join('')
+        }
+      </div>
+
+      <!-- Action Items -->
+      <div>
+        <h2 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#444;margin-bottom:10px">✅ Action Items</h2>
+        ${repActions.length === 0
+          ? '<p style="color:#999;font-size:12px">No action items assigned.</p>'
+          : `<table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead><tr style="background:#f3f4f6">
+                <th style="padding:7px 10px;text-align:left;border:1px solid #e5e7eb">Account</th>
+                <th style="padding:7px 10px;text-align:left;border:1px solid #e5e7eb">Action Item</th>
+                <th style="padding:7px 10px;text-align:left;border:1px solid #e5e7eb">Due</th>
+                <th style="padding:7px 10px;text-align:left;border:1px solid #e5e7eb">Status</th>
+              </tr></thead>
+              <tbody>
+                ${repActions.map(a => `<tr>
+                  <td style="padding:8px 10px;border:1px solid #e5e7eb;vertical-align:top;white-space:nowrap">${escHtml(a.deal||'—')}</td>
+                  <td style="padding:8px 10px;border:1px solid #e5e7eb;vertical-align:top">${escHtml(a.action)}</td>
+                  <td style="padding:8px 10px;border:1px solid #e5e7eb;vertical-align:top;white-space:nowrap">${a.due||'—'}</td>
+                  <td style="padding:8px 10px;border:1px solid #e5e7eb;vertical-align:top"><span style="background:${statusBg(a.status)};padding:2px 7px;border-radius:4px">${escHtml(a.status)}</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`
+        }
+      </div>
+    </div>`;
+
+  printArea.style.display = 'block';
+  window.print();
+  setTimeout(() => { printArea.innerHTML = ''; printArea.style.display = 'none'; }, 1500);
+}
+
+function renderWeeklySummary() {
+  if (!data.repActions) data.repActions = {};
+
+  const summWk = document.getElementById('summaryWeekOf');
+  const weekKey = summWk?.value || data.summaryWeekOf || getMondayOf(new Date().toISOString().slice(0,10));
+  if (summWk && data.summaryWeekOf && !summWk.value) summWk.value = data.summaryWeekOf;
+
+  // Rep filter
+  const repSel = document.getElementById('summaryRepFilter');
+  if (repSel) {
+    const cur = repSel.value;
+    repSel.innerHTML = '<option value="">All Reps</option>' + MLG_REPS.filter(r=>r!=='Blank').map(r =>
+      `<option value="${escHtml(r)}" ${r===cur?'selected':''}>${escHtml(r)}</option>`
+    ).join('');
+  }
+  const repFilter = repSel?.value || '';
+
+  // Get weekly notes for this week
+  const weekNotes = (data.weeklyHistory||{})[weekKey] || {};
+
+  // Team KPIs
+  const active = data.deals.filter(d => d.status==='Active').length;
+  const stalled = data.deals.filter(d => d.status==='Stalled').length;
+  const pipeline = data.deals.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+  const progressed = Object.values(weekNotes).filter(n => n.prog==='↑ Progressed').length;
+  const won = data.deals.filter(d=>d.stage==='Closed Won').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
 
   document.getElementById('summaryKPIs').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Total Active Deals</div><div class="kpi-value green">${active}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Progressed This Week</div><div class="kpi-value accent">${progressed}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Stalled Deals</div><div class="kpi-value yellow">${stalled}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Not Live</div><div class="kpi-value red">${notlive}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Total Pipeline ($)</div><div class="kpi-value">${fmt$(pipeline)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Active Deals</div><div class="kpi-value green">${active}</div></div>
+    <div class="kpi-card"><div class="kpi-label">↑ Progressed This Week</div><div class="kpi-value accent">${progressed}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Stalled</div><div class="kpi-value yellow">${stalled}</div></div>
+    <div class="kpi-card" style="border-color:rgba(45,217,143,0.4)"><div class="kpi-label" style="color:var(--green)">🏆 Closed Won</div><div class="kpi-value green">${fmt$(won)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Open Pipeline</div><div class="kpi-value accent">${fmt$(pipeline)}</div></div>
   `;
 
-  document.getElementById('topDealsTbody').innerHTML = data.topDeals.map((d, i) => `
-    <tr data-idx="${i}" class="${statusRowClass(d.status)}">
-      <td>${inp(d.name)}</td><td>${inp(d.account)}</td><td>${inp(d.owner)}</td>
-      <td><select onchange="schedSave()">${selOpts(STATUSES, d.status)}</select></td>
-      <td><select onchange="schedSave()">${selOpts(PROG_OPTIONS, d.prog)}</select></td>
-      <td><textarea rows="1" onchange="schedSave()">${escHtml(d.keyNotes)}</textarea></td>
-      <td>${inp(d.actionItem)}</td>
-      <td>${inpDate(d.due)}</td>
-      <td><select onchange="schedSave()"><option ${d.closed==='Yes'?'selected':''}>Yes</option><option ${d.closed!=='Yes'?'selected':''}>No</option></select></td>
-      <td><textarea rows="1" onchange="schedSave()">${escHtml(d.notes)}</textarea></td>
-      <td><button class="delete-btn" onclick="data.topDeals.splice(${i},1);renderWeeklySummary();schedSave()">✕</button></td>
-    </tr>`).join('');
+  const repsToShow = MLG_REPS.filter(r => r !== 'Blank' && (!repFilter || r === repFilter));
+  const container = document.getElementById('repCardsContainer');
 
+  container.innerHTML = repsToShow.map(rep => {
+    const repId = rep.replace(/\s+/g,'_');
+    const repDeals = data.deals.filter(d => d.mlgRep === rep && d.status !== 'Not Live');
+    const repActions = ((data.repActions[weekKey]||{})[rep]) || [];
+
+    // Deals with notes this week
+    const dealsWithNotes = repDeals.filter(d => {
+      const n = weekNotes[d.id];
+      return n && (n.prog || n.weeklyNote || n.blockers || n.actions || n.managerComment);
+    });
+    // Account names for dropdown (unique, sorted)
+    const accountOpts = [...new Set(repDeals.map(d => d.account).filter(Boolean))].sort()
+      .map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+
+    const repPipeline = repDeals.filter(d=>d.stage!=='Closed Won'&&d.stage!=='Closed Lost').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+    const repWon = repDeals.filter(d=>d.stage==='Closed Won').reduce((s,d)=>s+(parseFloat(d.acv)||0),0);
+    const repProg = dealsWithNotes.filter(d => (weekNotes[d.id]||{}).prog==='↑ Progressed').length;
+
+    const progClass = v => v==='↑ Progressed' ? 'prog-up' : v==='↓ Regressed' ? 'prog-down' : 'prog-flat';
+
+    return `
+    <div class="rep-card" id="repCard_${repId}">
+      <div class="rep-card-header">
+        <div>
+          <div class="rep-card-name">${escHtml(rep)}</div>
+          <div class="rep-card-meta">Pipeline: ${fmt$(repPipeline)} &nbsp;·&nbsp; 🏆 Won: ${fmt$(repWon)} &nbsp;·&nbsp; ↑ ${repProg} Progressed</div>
+        </div>
+        <button class="print-btn no-print" onclick="collectRepActions('${rep}','${weekKey}');printRepCard('${rep}')">🖨 Print / PDF</button>
+      </div>
+      <div class="rep-card-body" id="repCard_body_${repId}">
+
+        <div class="rep-section-label">📋 Deal Notes This Week</div>
+        ${dealsWithNotes.length === 0 ? `<div style="font-size:11px;color:var(--text-dim);padding:8px 0">No notes entered in Weekly Notes for this week.</div>` :
+          dealsWithNotes.map(d => {
+            const n = weekNotes[d.id] || {};
+            return `<div class="deal-note-row">
+              <div class="deal-note-name">${escHtml(d.name)}<div style="font-size:10px;color:var(--text-muted)">${escHtml(d.account)}</div></div>
+              <div><span class="prog-pill ${progClass(n.prog)}">${escHtml(n.prog||'—')}</span></div>
+              <div style="color:var(--text);font-size:11px">${escHtml(n.weeklyNote||'')}${n.blockers?`<div style="color:var(--red);margin-top:3px;font-size:10px">⚠ ${escHtml(n.blockers)}</div>`:''}</div>
+              <div style="color:var(--purple);font-size:11px">${n.managerComment?`💬 ${escHtml(n.managerComment)}`:''}</div>
+            </div>`;
+          }).join('')
+        }
+
+        <div class="rep-section-label" style="margin-top:16px">✅ Action Items for ${escHtml(rep.split(' ')[0])}</div>
+        <div id="repActions_${repId}_${weekKey}">
+          ${repActions.map((a, i) => `
+          <div class="action-item-row" data-idx="${i}">
+            <select onchange="schedSave()" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 7px;border-radius:5px;outline:none;width:120px;flex-shrink:0">
+              <option value="">— Account —</option>
+              ${[...new Set(repDeals.map(d=>d.account).filter(Boolean))].sort().map(acct =>
+                `<option value="${escHtml(acct)}" ${a.deal===acct?'selected':''}>${escHtml(acct)}</option>`
+              ).join('')}
+              ${a.deal && !repDeals.some(d=>d.account===a.deal) ? `<option value="${escHtml(a.deal)}" selected>${escHtml(a.deal)}</option>` : ''}
+            </select>
+            <textarea onchange="schedSave()" placeholder="Action item..." rows="2" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 7px;border-radius:5px;outline:none;resize:vertical;min-height:44px;flex:1">${escHtml(a.action)}</textarea>
+            <input type="date" value="${a.due||''}" onchange="schedSave()">
+            <select onchange="schedSave()" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 7px;border-radius:5px;outline:none">
+              <option ${a.status==='Open'?'selected':''}>Open</option>
+              <option ${a.status==='In Progress'?'selected':''}>In Progress</option>
+              <option ${a.status==='Done'?'selected':''}>Done</option>
+            </select>
+            <button class="delete-btn" onclick="event.stopPropagation();collectRepActions('${rep}','${weekKey}');(data.repActions['${weekKey}']['${rep}']||[]).splice(${i},1);renderWeeklySummary();schedSave()">✕</button>
+          </div>`).join('')}
+        </div>
+        <button class="add-action-btn no-print" onclick="collectRepActions('${rep}','${weekKey}');addRepAction('${rep}','${weekKey}')">＋ Add Action Item</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Manager Actions
   document.getElementById('managerActionsTbody').innerHTML = data.managerActions.map((a, i) => {
     const pClass = a.priority === 'High' ? 'priority-high' : a.priority === 'Low' ? 'priority-low' : 'priority-med';
     return `<tr data-idx="${i}">
@@ -1530,7 +1815,7 @@ function renderSellerCredit() {
       <div class="kpi-value green">${fmt$(wonCredit)}</div>
     </div>
     <div class="kpi-card"><div class="kpi-label">Open Pipeline Credit</div><div class="kpi-value accent">${fmt$(openCredit)}</div></div>
-    <div class="kpi-card"><div class="kpi-label">Wtd Credit</div><div class="kpi-value" style="color:var(--purple)">${fmt$(wtdCredit)}</div></div>
+
     ${repData.map(r => `
     <div class="kpi-card">
       <div class="kpi-label" style="color:var(--text-muted)">${escHtml(r.rep)}</div>
@@ -1564,14 +1849,12 @@ function renderSellerCredit() {
       <td style="color:var(--text-muted)">${fmt$(parseFloat(d.acv)||0)}</td>
       <td style="color:var(--purple);font-weight:600">${fmt$(sc)}</td>
       <td>${d.prob||0}%</td>
-      <td style="color:var(--purple)">${isWon ? '—' : fmt$(wtdSC)}</td>
     </tr>`;
   }).join('') + `<tr style="background:var(--surface2);font-weight:600;border-top:2px solid var(--border-light)">
     <td colspan="7" style="color:var(--text-muted);font-size:11px;text-transform:uppercase">Totals (${filtered.length} deals)</td>
     <td style="color:var(--text-muted)">${fmt$(totalNetACV)}</td>
     <td style="color:var(--purple)">${fmt$(totalSC)}</td>
     <td></td>
-    <td style="color:var(--purple)">${fmt$(totalWtdSC)}</td>
   </tr>`;
 }
 
@@ -1609,6 +1892,9 @@ function buildMultiSelect(containerId, options, allLabel, onChange) {
 // Convenience wrappers
 function buildStageMultiSelect(containerId, onChange) {
   buildMultiSelect(containerId, STAGES, 'All Stages', onChange);
+}
+function buildStatusMultiSelect(containerId, onChange) {
+  buildMultiSelect(containerId, STATUSES, 'All Statuses', onChange);
 }
 function buildRepMultiSelect(containerId, onChange) {
   buildMultiSelect(containerId, MLG_REPS, 'All Reps', onChange);
@@ -1696,10 +1982,13 @@ const SEED_DATA = {"deals":[{"id":1779195677576,"name":"Agetic AI/MCP","account"
 function applyData(incoming) {
   data = incoming;
   if (!data.deals) data.deals = [];
+  // Default sellerCredit to acv for any deal where sellerCredit is unset
+  data.deals.forEach(d => { if (!d.sellerCredit && d.acv) d.sellerCredit = d.acv; });
   if (!data.weeklyNotes) data.weeklyNotes = {};
   if (!data.weeklyHistory) data.weeklyHistory = {};
   if (!data.topDeals) data.topDeals = [];
   if (!data.managerActions) data.managerActions = [];
+  if (!data.repActions) data.repActions = {};
   if (!data.meddpicc) data.meddpicc = [];
   if (!data.forecastYear) data.forecastYear = 2026;
   // Restore current week key
@@ -1793,7 +2082,7 @@ if (daysLeft <= 7 && daysLeft > 0) {
         <tr>
           <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th>
           <th>Status</th><th>Stage</th><th>Close Month</th>
-          <th>Net ACV ($)</th><th>MLG Seller Credit ($)</th><th>Prob %</th><th>Wtd Credit ($)</th>
+          <th>Net ACV ($)</th><th>MLG Seller Credit ($)</th><th>Prob %</th>
         </tr>
       </thead>
       <tbody id="scTbody"></tbody>
