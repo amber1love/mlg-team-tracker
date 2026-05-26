@@ -86,7 +86,8 @@
   .kpi-value.accent { color: var(--accent); }
 
   /* TABLES */
-  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 24px; }
+  .table-wrap { overflow-x: auto; overflow-y: auto; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 24px; max-height: calc(100vh - 220px); }
+  .table-wrap thead th { position: sticky; top: 0; z-index: 2; }
   table { width: 100%; border-collapse: collapse; min-width: 900px; }
   thead th {
     background: var(--surface2); padding: 9px 10px; text-align: left;
