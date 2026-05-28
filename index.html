@@ -522,12 +522,18 @@
 
   <div class="table-wrap">
     <table id="weeklyNotesTable">
+      <colgroup>
+        <col style="min-width:140px"><col style="min-width:120px"><col style="min-width:90px">
+        <col style="min-width:90px"><col style="min-width:80px"><col style="min-width:150px">
+        <col style="width:60px;max-width:70px"><col style="min-width:90px">
+        <col style="min-width:90px"><col style="min-width:180px">
+        <col style="min-width:180px"><col style="min-width:220px"><col style="min-width:220px">
+      </colgroup>
       <thead>
         <tr>
           <th>Deal Name</th><th>Account</th><th>Owner</th><th>MLG Rep</th><th>Status</th><th>Stage</th><th>Close Month</th><th>Net ACV ($)</th>
           <th>Progression ↑↓→</th><th>Weekly Notes</th><th>Blockers / Risks</th>
-          <th>Action Items</th><th>Action Owner</th><th>Due Date</th>
-          <th>Forecast Impact ($)</th><th>Manager Comments</th>
+          <th>Pain / Cost of Inaction</th><th>Manager Comments</th>
           <th style="background:rgba(79,142,247,0.12);color:var(--accent)">M – Metrics</th>
           <th style="background:rgba(79,142,247,0.12);color:var(--accent)">E – Econ. Buyer</th>
           <th style="background:rgba(79,142,247,0.12);color:var(--accent)">D – Dec. Criteria</th>
@@ -853,18 +859,49 @@ function syncSellerCredit(acvInput, dealId) {
 
 function addDeal() {
   setEditing();
-  // Read active rep filter to pre-fill mlgRep
   const mlgReps2 = getSelectedMS('dealMLGFilter');
   const mlgFVal = (mlgReps2 && mlgReps2.length === 1) ? mlgReps2[0] : '';
-  data.deals.push({
-    id: Date.now(), name:'', account:'', owner:'', mlgRep: mlgFVal, status:'Active',
+  const newId = Date.now();
+  const newDeal = {
+    id: newId, name:'', account:'', owner:'', mlgRep: mlgFVal, status:'Active',
     stage:'Stage 0- Unique Meeting Set', closeDate:'', forecastBucket:'Pipeline',
     prob:0, acv:0, sellerCredit:0, champion:'', lastActivity:'', nextStep:'', notes:''
-  });
-  // Clear all filters so the new blank row is visible
-  clearDealFilters();
-  renderDeals();
+  };
+  data.deals.push(newDeal);
   schedSave();
+
+  // Inject the new row directly into the existing table without re-rendering
+  // This preserves all active filters and avoids flashing the full deal list
+  const tbody = document.getElementById('dealTbody');
+  if (tbody) {
+    const d = newDeal;
+    const wtdVal = 0;
+    const tr = document.createElement('tr');
+    tr.dataset.id = newId;
+    tr.className = statusRowClass(d.status);
+    tr.innerHTML = `
+      <td><input type="text" data-field="name" value="" onchange="schedSave()"></td>
+      <td><input type="text" data-field="account" value="" onchange="schedSave()"></td>
+      <td><input type="text" data-field="owner" value="" onchange="schedSave()"></td>
+      <td><select data-field="mlgRep" onchange="schedSave()">${selOpts(MLG_REPS, mlgFVal)}</select></td>
+      <td><select data-field="status" onchange="schedSave(); renderDeals()">${selOpts(STATUSES, 'Active')}</select></td>
+      <td><select data-field="stage" onchange="schedSave()">${selOpts(STAGES, 'Stage 0- Unique Meeting Set')}</select></td>
+      <td>${inpMonth('')}</td>
+      <td><select data-field="forecastBucket" onchange="schedSave()">${selOpts(FORECAST_BUCKETS, 'Pipeline')}</select></td>
+      <td><input type="number" data-field="prob" value="" min="0" max="100" style="width:55px" onchange="schedSave()">%</td>
+      <td><input type="text" data-field="acv" value="" style="width:100px" onchange="syncSellerCredit(this,${newId});schedSave()" onfocus="this.value=stripCommas(this.value)" onblur="this.value=fmtNum(parseFloat(stripCommas(this.value))||0)"></td>
+      <td><input type="text" data-field="sellerCredit" id="sc_${newId}" value="" style="width:100px;color:var(--purple);font-weight:500" onchange="schedSave()" onfocus="this.value=stripCommas(this.value)" onblur="this.value=fmtNum(parseFloat(stripCommas(this.value))||0)" placeholder="= Net ACV"></td>
+      <td style="color:var(--text)">—</td>
+      <td><input type="text" data-field="champion" value="" onchange="schedSave()"></td>
+      <td><input type="date" data-field="lastActivity" value="" onchange="schedSave()"></td>
+      <td><textarea data-field="nextStep" rows="2" onchange="schedSave()"></textarea></td>
+      <td><textarea data-field="notes" rows="2" onchange="schedSave()"></textarea></td>
+      <td><button class="delete-btn" onclick="deleteDeal(${newId})" title="Delete">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+    tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    tr.querySelector('input')?.focus();
+  }
 }
 
 function clearDealFilters() {
@@ -954,12 +991,9 @@ function renderDeals() {
     <div class="kpi-card" style="border-color: rgba(45,217,143,0.4); background: linear-gradient(135deg, var(--surface) 0%, rgba(45,217,143,0.07) 100%);">
       <div class="kpi-label" style="color:var(--green)">🏆 Closed Won${filterLabel}</div>
       <div class="kpi-value green">${fmt$(closedWon)}</div>
+      <div style="font-size:10px;color:var(--purple);margin-top:4px">💰 ${fmt$(filtered.filter(d=>d.stage==='Closed Won').reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0))} seller credit</div>
     </div>
     <div class="kpi-card"><div class="kpi-label">Pipeline${filterLabel}</div><div class="kpi-value accent">${fmt$(pipeline)}</div></div>
-    <div class="kpi-card" style="border-color:rgba(167,139,250,0.4);background:linear-gradient(135deg,var(--surface) 0%,rgba(167,139,250,0.07) 100%)">
-      <div class="kpi-label" style="color:var(--purple)">💰 Seller Credit${filterLabel}</div>
-      <div class="kpi-value" style="color:var(--purple)">${fmt$(filtered.reduce((s,d)=>s+(parseFloat(d.sellerCredit)||0),0))}</div>
-    </div>
   `;
 
   const tbody = document.getElementById('dealTbody');
@@ -1318,16 +1352,13 @@ function renderWeeklyNotes() {
       <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.mlgRep||'')}</td>
       <td>${statusBadge(d.status)}</td>
       <td style="font-size:11px;color:var(--text-muted)">${escHtml(d.stage)}</td>
-      <td style="font-size:11px;color:var(--text-muted)">${fmtCloseMonth(d.closeDate)}</td>
+      <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;width:60px">${fmtCloseMonth(d.closeDate)}</td>
       <td style="color:var(--text);font-weight:500">${fmtNum(d.acv)}</td>
       <td><select class="prog-select" data-field="prog" onchange="schedSave()">${selOpts(PROG_OPTIONS, n.prog)}</select></td>
-      <td><textarea rows="2" data-field="weeklyNote" onchange="schedSave()">${escHtml(n.weeklyNote||'')}</textarea></td>
-      <td><textarea rows="2" data-field="blockers" onchange="schedSave()">${escHtml(n.blockers||'')}</textarea></td>
-      <td><textarea rows="2" data-field="actions" onchange="schedSave()">${escHtml(n.actions||'')}</textarea></td>
-      <td><input type="text" data-field="actionOwner" value="${escHtml(n.actionOwner||'')}" onchange="schedSave()"></td>
-      <td><input type="date" data-field="dueDate" value="${n.dueDate||''}" onchange="schedSave()"></td>
-      <td><input type="number" data-field="forecastImpact" value="${n.forecastImpact||''}" style="width:70px" onchange="schedSave()"></td>
-      <td><textarea rows="2" data-field="managerComment" onchange="schedSave()">${escHtml(n.managerComment||'')}</textarea></td>
+      <td><textarea rows="3" data-field="weeklyNote" onchange="schedSave()" style="min-width:160px;width:100%">${escHtml(n.weeklyNote||'')}</textarea></td>
+      <td><textarea rows="3" data-field="blockers" onchange="schedSave()" style="min-width:160px;width:100%">${escHtml(n.blockers||'')}</textarea></td>
+      <td><textarea rows="3" data-field="painCOI" onchange="schedSave()" style="min-width:200px;width:100%">${escHtml(n.painCOI||'')}</textarea></td>
+      <td><textarea rows="3" data-field="managerComment" onchange="schedSave()" style="min-width:200px;width:100%">${escHtml(n.managerComment||'')}</textarea></td>
       ${p ? prevCols : ''}
       <td style="${mBg}"><textarea rows="2" data-mfield="metrics" onchange="updateMeddpiccField(${d.id},'metrics',this.value)">${escHtml(mRow.metrics||'')}</textarea></td>
       <td style="${mBg}"><textarea rows="2" data-mfield="econBuyer" onchange="updateMeddpiccField(${d.id},'econBuyer',this.value)">${escHtml(mRow.econBuyer||'')}</textarea></td>
