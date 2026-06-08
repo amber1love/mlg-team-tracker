@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MLG Team Tracker</title>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -423,7 +420,7 @@
   <div class="save-indicator" id="saveIndicator"></div>
   <div id="syncStatus" style="display:flex;align-items:center;gap:8px;font-size:11px;white-space:nowrap">
     <span id="syncDot" style="width:8px;height:8px;border-radius:50%;background:var(--text-dim);display:inline-block"></span>
-    <span id="syncLabel" style="color:var(--text-muted)">Connecting...</span>
+    <span id="syncLabel" style="color:var(--text-muted)">Loading...</span>
   </div>
   <button class="save-btn" onclick="forceSave()" title="Force save now">💾 Save</button>
 </div>
@@ -705,18 +702,51 @@ let currentQuarter = 'Q1';
 let dealSortField = '';   // field to sort by
 let dealSortDir = 'asc';  // 'asc' or 'desc'
 
-// ===== FIREBASE SETUP =====
-const firebaseConfig = {
-  apiKey: "AIzaSyCImIECuYRT_uBdA47oY9c1KDu7afZM4Sk",
-  authDomain: "mlg-team-tracker.firebaseapp.com",
-  projectId: "mlg-team-tracker",
-  storageBucket: "mlg-team-tracker.firebasestorage.app",
-  messagingSenderId: "1069654561056",
-  appId: "1:1069654561056:web:99b01e043e520c7452c745"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const DOC_REF = db.collection('tracker').doc('team');
+// ===== JSONBIN SETUP =====
+const JSONBIN_API_KEY = "$2a$10$UU7n5UWvw.PqmVFAdDmRNOn2RdrT8jleWS6zUDA98QMmiO4cX0zqm";
+const JSONBIN_BASE = "https://api.jsonbin.io/v3";
+let BIN_ID = localStorage.getItem('mlgJsonBinId') || '';
+
+async function jsonbinGet() {
+  if (!BIN_ID) return null;
+  const resp = await fetch(`${JSONBIN_BASE}/b/${BIN_ID}/latest`, {
+    headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' }
+  });
+  if (!resp.ok) throw new Error('GET ' + resp.status);
+  return (await resp.json()).record;
+}
+
+async function jsonbinSet(dataObj) {
+  if (!BIN_ID) {
+    const resp = await fetch(`${JSONBIN_BASE}/b`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Name': 'mlg-team-tracker', 'X-Bin-Private': 'false' },
+      body: JSON.stringify(dataObj)
+    });
+    if (!resp.ok) throw new Error('Create ' + resp.status);
+    BIN_ID = (await resp.json()).metadata.id;
+    localStorage.setItem('mlgJsonBinId', BIN_ID);
+    return;
+  }
+  const resp = await fetch(`${JSONBIN_BASE}/b/${BIN_ID}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
+    body: JSON.stringify(dataObj)
+  });
+  if (!resp.ok) throw new Error('PUT ' + resp.status);
+}
+
+let pollInterval = null;
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    if (isEditing || isSaving) return;
+    try {
+      const remote = await jsonbinGet();
+      if (remote && remote.deals) { applyData(remote); setSyncStatus('live'); }
+    } catch(e) {}
+  }, 30000);
+}
 
 let isSaving = false;
 let pendingSave = false;
@@ -761,31 +791,20 @@ function collectActive() {
 
 function saveAll() {
   collectActive();
-  // Also keep localStorage as offline fallback
   localStorage.setItem('mlgTeamTracker_v1', JSON.stringify(data));
   if (isSaving) { pendingSave = true; return; }
   isSaving = true;
   setSyncStatus('saving');
-  DOC_REF.set(data)
-    .then(() => {
-      isSaving = false;
-      setSyncStatus('live');
-      if (pendingSave) { pendingSave = false; saveAll(); }
-    })
-    .catch(err => {
-      isSaving = false;
-      setSyncStatus('error');
-      console.error('Firebase save error:', err);
-    });
+  jsonbinSet(data)
+    .then(() => { isSaving = false; setSyncStatus('live'); if (pendingSave) { pendingSave = false; saveAll(); } })
+    .catch(err => { isSaving = false; setSyncStatus('error'); console.error('JSONBin save error:', err); });
 }
 
 function forceSave() {
   collectActive();
   localStorage.setItem('mlgTeamTracker_v1', JSON.stringify(data));
   setSyncStatus('saving');
-  DOC_REF.set(data)
-    .then(() => setSyncStatus('live'))
-    .catch(() => setSyncStatus('error'));
+  jsonbinSet(data).then(() => setSyncStatus('live')).catch(() => setSyncStatus('error'));
 }
 
 // ===== UTILITIES =====
@@ -2248,50 +2267,32 @@ function applyData(incoming) {
 }
 
 // Start Firebase real-time listener
+// Load locally first so the app is never stuck waiting
+const _localData = localStorage.getItem('mlgTeamTracker_v1');
+applyData(_localData ? JSON.parse(_localData) : JSON.parse(JSON.stringify(SEED_DATA)));
 setSyncStatus('connecting');
-DOC_REF.get().then(doc => {
-  if (doc.exists) {
-    applyData(doc.data());
-    setSyncStatus('live');
-  } else {
-    // First time — seed with existing deals
-    applyData(JSON.parse(JSON.stringify(SEED_DATA)));
-    DOC_REF.set(data).then(() => setSyncStatus('live')).catch(() => setSyncStatus('error'));
-  }
-  // Start live listener for changes from other users
-  unsubscribe = DOC_REF.onSnapshot(snapshot => {
-    if (snapshot.metadata.hasPendingWrites) return; // skip our own writes
-    if (isEditing) return; // skip if user is actively typing/editing
-    if (snapshot.exists) {
-      applyData(snapshot.data());
+
+// Then sync with JSONBin in the background
+(async () => {
+  try {
+    const remote = BIN_ID ? await jsonbinGet() : null;
+    if (remote && remote.deals) {
+      applyData(remote);
+      setSyncStatus('live');
+    } else {
+      // No bin yet — push local data up
+      await jsonbinSet(data);
       setSyncStatus('live');
     }
-  }, err => {
-    setSyncStatus('error');
-    console.error('Firestore listener error:', err);
-  });
-}).catch(err => {
-  // Offline fallback — load from localStorage
-  setSyncStatus('offline');
-  const local = localStorage.getItem('mlgTeamTracker_v1');
-  if (local) {
-    applyData(JSON.parse(local));
-  } else {
-    applyData(JSON.parse(JSON.stringify(SEED_DATA)));
+    startPolling();
+  } catch(err) {
+    setSyncStatus('offline');
+    console.error('JSONBin sync error:', err);
+    startPolling();
   }
-  console.error('Firebase connect error:', err);
-});
+})();
 
-// 30-day rules reminder banner
-const CREATED_DATE = Date.now();
-const storedDate = localStorage.getItem('mlgFirebaseCreated');
-if (!storedDate) localStorage.setItem('mlgFirebaseCreated', CREATED_DATE);
-const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - parseInt(localStorage.getItem('mlgFirebaseCreated')||Date.now())) / 86400000));
-if (daysLeft <= 7 && daysLeft > 0) {
-  const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#f5c842;color:#0d0f14;padding:12px 16px;border-radius:8px;font-size:12px;z-index:9999;max-width:320px;font-family:monospace;box-shadow:0 4px 20px rgba(0,0,0,0.4)';
-  banner.innerHTML = `⚠ Firebase test mode expires in <strong>${daysLeft} day${daysLeft===1?'':'s'}</strong>. <a href="https://console.firebase.google.com/project/mlg-team-tracker/firestore/rules" target="_blank" style="color:#0d0f14;font-weight:700;text-decoration:underline">Update rules now →</a> <span onclick="this.parentElement.remove()" style="cursor:pointer;margin-left:8px">✕</span>`;
-  document.body.appendChild(banner);
+
 }
 
 
