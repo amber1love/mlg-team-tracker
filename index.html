@@ -150,7 +150,7 @@ tr.rn td:first-child{border-left:3px solid var(--red)}
     <div class="nav-tab" onclick="showPanel('weeklyforecast',this)">📅 Weekly Forecast</div>
     <div class="nav-tab" onclick="showPanel('instructions',this)">📋 Instructions</div>
   </div>
-  <div class="sync-wrap"><span id="syncDot"></span><span id="syncLabel">Loading...</span></div>
+  <div class="sync-wrap"><span id="syncDot"></span><span id="syncLabel">⚡ Offline</span></div>
   <button class="save-btn" onclick="forceSave()">💾 Save</button>
 </div>
 <!-- DEAL TRACKER -->
@@ -960,7 +960,6 @@ syncStatus('off');
     if(remote&&remote.deals&&remote.deals.length>0){
       applyData(remote);
     } else {
-      // Push current data (seed or local) up to JSONBin
       await jbSet(data);
     }
     syncStatus('ok');startPoll();
