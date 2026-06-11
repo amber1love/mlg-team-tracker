@@ -409,12 +409,21 @@ function badge(s){if(s==='Active')return`<span class="badge badge-g">🟢 Active
 function rowCls(s){if(s==='Active')return'ra';if(s==='Stalled')return'rs';if(s==='Not Live')return'rn';return'';}
 function selOpts(arr,cur){return arr.map(o=>`<option value="${esc(o)}"${o===cur?' selected':''}>${esc(o)}</option>`).join('');}
 function inpMo(val){
-  const m=val&&val.match(/^(\d{4})-(\d{2})$/);
-  const m2=val&&val.match(/^(\d{1,2})$/);
-  const cur=m?`${m[1]}-${m[2]}`:m2?`2026-${String(parseInt(m2[1])).padStart(2,'0')}`:'';
+  // Normalise stored value to a 2-digit month number string e.g. "06"
+  let curMo = '';
+  if(val){
+    const m4=val.match(/^\d{4}-(\d{2})$/);
+    const m2=val.match(/^(\d{1,2})$/);
+    if(m4) curMo=m4[1].padStart(2,'0');
+    else if(m2) curMo=String(parseInt(m2[1])).padStart(2,'0');
+  }
+  const MN2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let opts='<option value="">—</option>';
-  [2025,2026,2027].forEach(y=>{opts+=`<optgroup label="${y}">`;for(let i=1;i<=12;i++){const v=`${y}-${String(i).padStart(2,'0')}`;opts+=`<option value="${v}"${v===cur?' selected':''}>${MN[i]}</option>`;}opts+='</optgroup>';});
-  return`<select data-field="closeDate" onchange="schedSave()" style="width:75px">${opts}</select>`;
+  MN2.forEach((name,i)=>{
+    const v=String(i+1).padStart(2,'0');
+    opts+=`<option value="${v}"${v===curMo?' selected':''}>${name}</option>`;
+  });
+  return`<select data-field="closeDate" onchange="schedSave()" style="width:72px">${opts}</select>`;
 }
 function getMoFromSelect(v){const m=v&&v.match(/^\d{4}-(\d{2})$/);return m?parseInt(m[1]):getMo(v);}
 
@@ -791,10 +800,13 @@ function getMK(d){const x=d||new Date();return`${x.getFullYear()}-${String(x.get
 function mkLbl(mk){const[yr,mo]=mk.split('-').map(Number);return new Date(yr,mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});}
 function visThursdays(mk){
   const all=getThursdays(mk);
-  const now=new Date();const td=new Date(now);const day=td.getDay();
-  td.setDate(td.getDate()-(day>=4?day-4:day+3));
-  const cut=td.toISOString().slice(0,10);
-  return all.filter(w=>w<=cut).reverse();
+  const now=new Date();
+  // Show week if its Thursday has passed OR today is Wednesday of that week (day before)
+  return all.filter(w=>{
+    const thu=new Date(w+'T12:00:00');
+    const wed=new Date(thu);wed.setDate(wed.getDate()-1); // Wednesday before the Thursday
+    return now>=wed;
+  }).reverse();
 }
 function wfV(mk,wk,rep,f){return(data.weeklyForecast[mk]?.[wk]?.[rep]?.[f])||0;}
 function wfSet(mk,wk,rep,f,v){
