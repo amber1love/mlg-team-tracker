@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>MLG Team Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -151,6 +154,7 @@ tr.rn td:first-child{border-left:3px solid var(--red)}
     <div class="nav-tab" onclick="showPanel('instructions',this)">📋 Instructions</div>
   </div>
   <div class="sync-wrap"><span id="syncDot"></span><span id="syncLabel">⚡ Offline</span></div>
+  <div id="binIdDisplay" style="font-size:9px;color:var(--text-dim);font-family:var(--mono);display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Copy this Bin ID and paste it into HARDCODED_BIN_ID in the code"></div>
   <button class="save-btn" onclick="forceSave()">💾 Save</button>
 </div>
 <!-- DEAL TRACKER -->
@@ -351,7 +355,12 @@ let isEditing=false;let editTimer=null;
 // ── JSONBIN ──
 const JB_KEY='$2a$10$UU7n5UWvw.PqmVFAdDmRNOn2RdrT8jleWS6zUDA98QMmiO4cX0zqm';
 const JB_BASE='https://api.jsonbin.io/v3';
-let BIN_ID=localStorage.getItem('mlgBinId')||'';
+// SHARED_BIN_ID: once first user creates the bin, this gets stored in their localStorage
+// Other team members on first open will have no BIN_ID — they create their own bin
+// To share ONE bin across team, after first open Amber should note the bin ID shown
+// and paste it below as HARDCODED_BIN_ID
+const HARDCODED_BIN_ID = ''; // ← paste bin ID here after first open e.g. '6852abc123...'
+let BIN_ID = HARDCODED_BIN_ID || localStorage.getItem('mlgBinId') || '';
 let isSaving=false;let pendingSave=false;
 
 function syncStatus(s){
@@ -370,7 +379,12 @@ async function jbSet(d){
   if(!BIN_ID){
     const r=await fetch(`${JB_BASE}/b`,{method:'POST',headers:{'Content-Type':'application/json','X-Master-Key':JB_KEY,'X-Bin-Name':'mlg-team-tracker','X-Bin-Private':'false'},body:JSON.stringify(d)});
     if(!r.ok)throw new Error('Create '+r.status);
-    BIN_ID=(await r.json()).metadata.id;localStorage.setItem('mlgBinId',BIN_ID);return;
+    BIN_ID=(await r.json()).metadata.id;
+    localStorage.setItem('mlgBinId',BIN_ID);
+    // Show the bin ID so it can be hardcoded for the whole team
+    const el=document.getElementById('binIdDisplay');
+    if(el){el.style.display='block';el.textContent='📋 Bin ID: '+BIN_ID+' (copy & share with team)';}
+    return;
   }
   const r=await fetch(`${JB_BASE}/b/${BIN_ID}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':JB_KEY},body:JSON.stringify(d)});
   if(!r.ok)throw new Error('PUT '+r.status);
