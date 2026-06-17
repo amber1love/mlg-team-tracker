@@ -155,6 +155,9 @@ tr.rn td:first-child{border-left:3px solid var(--red)}
   </div>
   <div class="sync-wrap"><span id="syncDot"></span><span id="syncLabel">⚡ Offline</span></div>
   <div id="binIdDisplay" style="font-size:9px;color:var(--text-dim);font-family:var(--mono);display:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Copy this Bin ID and paste it into HARDCODED_BIN_ID in the code"></div>
+  <button class="save-btn" onclick="exportData()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted)">📤 Export</button>
+  <button class="save-btn" onclick="document.getElementById('importFile').click()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted)">📂 Import</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
   <button class="save-btn" onclick="forceSave()">💾 Save</button>
 </div>
 <!-- DEAL TRACKER -->
@@ -352,62 +355,99 @@ let curQ='Q1';
 let sortField='';let sortDir='asc';
 let isEditing=false;let editTimer=null;
 
-// ── JSONBIN ──
-const JB_KEY='$2a$10$UU7n5UWvw.PqmVFAdDmRNOn2RdrT8jleWS6zUDA98QMmiO4cX0zqm';
-const JB_BASE='https://api.jsonbin.io/v3';
-// SHARED_BIN_ID: once first user creates the bin, this gets stored in their localStorage
-// Other team members on first open will have no BIN_ID — they create their own bin
-// To share ONE bin across team, after first open Amber should note the bin ID shown
-// and paste it below as HARDCODED_BIN_ID
-const HARDCODED_BIN_ID = '6a277fc4da38895dfe9d96e0'; // shared team bin
-let BIN_ID = HARDCODED_BIN_ID || localStorage.getItem('mlgBinId') || '';
-let isSaving=false;let pendingSave=false;
+// ── SUPABASE SYNC ──
+const SB_URL  = 'https://bhphlctxmhckdlwmkmzf.supabase.co';
 
 function syncStatus(s){
-  const states={ok:{c:'var(--green)',t:'🟢 Live'},saving:{c:'var(--accent)',t:'⟳ Saving...'},err:{c:'var(--red)',t:'⚠ Error'},off:{c:'var(--yellow)',t:'⚡ Offline'}};
+  const states={
+    ok:         { c:'var(--green)',  t:'🟢 Live — syncing with team' },
+    saving:     { c:'var(--accent)', t:'⟳ Saving...' },
+    connecting: { c:'var(--yellow)', t:'Connecting...' },
+    err:        { c:'var(--red)',    t:'⚠ Save error — retrying' },
+    off:        { c:'var(--yellow)', t:'⚡ Offline — local only' },
+  };
   const x=states[s]||states.off;
-  const d=document.getElementById('syncDot');const l=document.getElementById('syncLabel');
-  if(d)d.style.background=x.c;if(l)l.textContent=x.t;
+  const d=document.getElementById('syncDot');
+  const l=document.getElementById('syncLabel');
+  if(d)d.style.background=x.c;
+  if(l)l.textContent=x.t;
 }
-async function jbGet(){
-  if(!BIN_ID)return null;
-  const r=await fetch(`${JB_BASE}/b/${BIN_ID}/latest`,{headers:{'X-Master-Key':JB_KEY,'X-Bin-Meta':'false'}});
-  if(!r.ok)throw new Error('GET '+r.status);
-  return(await r.json()).record;
-}
-async function jbSet(d){
-  if(!BIN_ID){
-    const r=await fetch(`${JB_BASE}/b`,{method:'POST',headers:{'Content-Type':'application/json','X-Master-Key':JB_KEY,'X-Bin-Name':'mlg-team-tracker','X-Bin-Private':'false'},body:JSON.stringify(d)});
-    if(!r.ok)throw new Error('Create '+r.status);
-    BIN_ID=(await r.json()).metadata.id;
-    localStorage.setItem('mlgBinId',BIN_ID);
-    // Show the bin ID so it can be hardcoded for the whole team
-    const el=document.getElementById('binIdDisplay');
-    if(el){el.style.display='block';el.textContent='📋 Bin ID: '+BIN_ID+' (copy & share with team)';}
-    return;
-  }
-  const r=await fetch(`${JB_BASE}/b/${BIN_ID}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':JB_KEY},body:JSON.stringify(d)});
-  if(!r.ok)throw new Error('PUT '+r.status);
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJocGhsY3R4bWhja2Rsd21rbXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTA4NzksImV4cCI6MjA5NzI4Njg3OX0.3wO1aZZsB7WQQ8qj2yYvID0ghz7rYTkQ-sCSVDiGDNQ';
+const SB_HDRS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+const SB_ROW  = 'mlg_team_data';
+
+let isSaving = false;
+let pendingSave = false;
+
+async function sbRead() {
+  const r = await fetch(`${SB_URL}/rest/v1/tracker?id=eq.${SB_ROW}&select=data,updated_at`, {
+    headers: SB_HDRS
+  });
+  if (!r.ok) throw new Error('SB read ' + r.status);
+  const rows = await r.json();
+  if (!rows.length) return null;
+  // Supabase returns JSONB as parsed object directly
+  const row = rows[0];
+  return { data: row.data, updated_at: row.updated_at };
 }
 
-function saveAll(){
+async function sbWrite(dataObj) {
+  const r = await fetch(`${SB_URL}/rest/v1/tracker?id=eq.${SB_ROW}`, {
+    method: 'PATCH',
+    headers: { ...SB_HDRS, 'Prefer': 'return=minimal' },
+    body: JSON.stringify({ data: dataObj, updated_at: new Date().toISOString() })
+  });
+  if (!r.ok) throw new Error('SB write ' + r.status);
+}
+
+function saveAll() {
   collectActive();
-  localStorage.setItem('mlgData',JSON.stringify(data));
-  if(isSaving){pendingSave=true;return;}
-  isSaving=true;syncStatus('saving');
-  jbSet(data).then(()=>{isSaving=false;syncStatus('ok');if(pendingSave){pendingSave=false;saveAll();}}).catch(e=>{isSaving=false;syncStatus('err');console.error(e);});
+  localStorage.setItem('mlgData', JSON.stringify(data));
+  if (isSaving) { pendingSave = true; return; }
+  isSaving = true;
+  syncStatus('saving');
+  sbWrite(data)
+    .then(() => {
+      isSaving = false;
+      syncStatus('ok');
+      if (pendingSave) { pendingSave = false; saveAll(); }
+    })
+    .catch(e => {
+      isSaving = false;
+      syncStatus('err');
+      console.error('Save error:', e);
+    });
 }
-function forceSave(){collectActive();localStorage.setItem('mlgData',JSON.stringify(data));syncStatus('saving');jbSet(data).then(()=>syncStatus('ok')).catch(()=>syncStatus('err'));}
 
-let pollT=null;
-function startPoll(){
-  if(pollT)clearInterval(pollT);
-  pollT=setInterval(async()=>{
-    if(isEditing||isSaving)return;
-    try{const r=await jbGet();if(r&&r.deals){applyData(r);syncStatus('ok');}}catch(e){}
-  },30000);
+function forceSave() {
+  collectActive();
+  localStorage.setItem('mlgData', JSON.stringify(data));
+  syncStatus('saving');
+  sbWrite(data).then(() => syncStatus('ok')).catch(() => syncStatus('err'));
 }
 
+// Real-time: poll every 8 seconds for changes from other users
+let pollT = null;
+let lastUpdatedAt = null;
+
+function startPoll() {
+  if (pollT) clearInterval(pollT);
+  pollT = setInterval(async () => {
+    if (isEditing || isSaving) return;
+    try {
+      const row = await sbRead();
+      if (!row) return;
+      // Only re-apply if data changed since last read
+      if (row.updated_at !== lastUpdatedAt) {
+        lastUpdatedAt = row.updated_at;
+        if (row.data && row.data.deals) {
+          applyData(row.data);
+          syncStatus('ok');
+        }
+      }
+    } catch(e) { /* silent — don't interrupt user */ }
+  }, 8000);
+}
 function setEditing(){isEditing=true;clearTimeout(editTimer);editTimer=setTimeout(()=>{isEditing=false;},3000);}
 let saveTimer;
 function schedSave(){setEditing();clearTimeout(saveTimer);saveTimer=setTimeout(saveAll,900);}
@@ -483,7 +523,70 @@ function applyData(d){
 }
 
 // ── COLLECT ACTIVE ──
-function collectActive(){
+function exportData(){
+  collectActive();
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`mlg-tracker-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importData(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const imported=JSON.parse(e.target.result);
+      if(!imported.deals){alert('Invalid file — no deals found.');return;}
+      // Merge deals: imported deals overwrite existing ones by ID, new ones get added
+      const existingIds=new Set(data.deals.map(d=>d.id));
+      let added=0,updated=0;
+      imported.deals.forEach(d=>{
+        if(existingIds.has(d.id)){
+          const idx=data.deals.findIndex(x=>x.id===d.id);
+          data.deals[idx]=d;updated++;
+        } else {
+          data.deals.push(d);added++;existingIds.add(d.id);
+        }
+      });
+      // Merge weekly history
+      if(imported.weeklyHistory){
+        Object.entries(imported.weeklyHistory).forEach(([wk,notes])=>{
+          if(!data.weeklyHistory[wk])data.weeklyHistory[wk]={};
+          Object.assign(data.weeklyHistory[wk],notes);
+        });
+      }
+      // Merge weekly forecast
+      if(imported.weeklyForecast){
+        Object.entries(imported.weeklyForecast).forEach(([mk,weeks])=>{
+          if(!data.weeklyForecast[mk])data.weeklyForecast[mk]={};
+          Object.entries(weeks).forEach(([wk,reps])=>{
+            if(!data.weeklyForecast[mk][wk])data.weeklyForecast[mk][wk]={};
+            Object.assign(data.weeklyForecast[mk][wk],reps);
+          });
+        });
+      }
+      // Merge meddpicc
+      if(imported.meddpicc){
+        imported.meddpicc.forEach(m=>{
+          const idx=data.meddpicc.findIndex(x=>x.dealId===m.dealId);
+          if(idx>-1)data.meddpicc[idx]=m;else data.meddpicc.push(m);
+        });
+      }
+      saveAll();
+      renderDeals();
+      alert(`✅ Import complete!\n${updated} deals updated, ${added} new deals added.`);
+    }catch(err){
+      alert('Import failed — invalid file format.');
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
+  input.value=''; // reset so same file can be re-imported
+}
+
+
   const ap=document.querySelector('.panel.active')?.id||'';
   if(document.getElementById('dealTbody')?.querySelectorAll('tr[data-id]').length>0)collectDeals();
   saveWN();
@@ -979,18 +1082,38 @@ try{
   else applyData(JSON.parse(JSON.stringify(SEED)));
 }catch(e){console.error('Local load error:',e);applyData(JSON.parse(JSON.stringify(SEED)));}
 
+// ── STARTUP ──
+// Load locally first — never block on network
+try{
+  const _loc=localStorage.getItem('mlgData');
+  if(_loc){ try{applyData(JSON.parse(_loc));}catch(e){applyData(JSON.parse(JSON.stringify(SEED)));} }
+  else{ applyData(JSON.parse(JSON.stringify(SEED))); }
+}catch(e){ applyData(JSON.parse(JSON.stringify(SEED))); }
+
 syncStatus('off');
+
+// Sync with Supabase in background
 (async()=>{
   try{
-    const remote=BIN_ID?await jbGet():null;
-    if(remote&&remote.deals&&remote.deals.length>0){
-      applyData(remote);
+    syncStatus('connecting');
+    const row = await sbRead();
+    console.log('Supabase response:', row);
+    if(row && row.data && row.data.deals && row.data.deals.length > 0){
+      lastUpdatedAt = row.updated_at;
+      applyData(row.data);
+      console.log('Loaded', row.data.deals.length, 'deals from Supabase');
     } else {
-      await jbSet(data);
+      // First time or empty — push all 126 seed deals up to Supabase
+      console.log('No remote data found — pushing seed data to Supabase...');
+      await sbWrite(data);
+      console.log('Seed data pushed successfully');
     }
-    syncStatus('ok');startPoll();
-  }catch(e){
-    syncStatus('off');console.warn('JSONBin unavailable:',e.message);startPoll();
+    syncStatus('ok');
+    startPoll();
+  } catch(e){
+    syncStatus('off');
+    console.warn('Supabase unavailable:', e.message);
+    startPoll();
   }
 })();
 </script>
