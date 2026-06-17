@@ -587,6 +587,7 @@ function importData(input){
 }
 
 
+function collectActive(){
   const ap=document.querySelector('.panel.active')?.id||'';
   if(document.getElementById('dealTbody')?.querySelectorAll('tr[data-id]').length>0)collectDeals();
   saveWN();
