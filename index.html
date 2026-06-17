@@ -456,22 +456,46 @@ function schedSave(){setEditing();clearTimeout(saveTimer);saveTimer=setTimeout(s
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtN(n){if(!n&&n!==0)return'';const v=parseFloat(n);if(isNaN(v)||v===0)return'';return v.toLocaleString('en-US');}
 function stripC(v){return String(v||'').replace(/,/g,'');}
-function fmtMo(v){if(!v)return'—';const m4=v.match(/^\d{4}-(\d{2})$/);if(m4)return MN[parseInt(m4[1])];const m2=v.match(/^(\d{1,2})$/);if(m2)return MN[parseInt(m2[1])]||'—';return v;}
-function getMo(v){if(!v)return null;const m4=v.match(/^\d{4}-(\d{2})$/);if(m4)return parseInt(m4[1]);const m2=v.match(/^(\d{1,2})$/);if(m2)return parseInt(m2[1]);return null;}
+function fmtMo(v){
+  if(!v)return'—';
+  const s=String(v).trim();
+  const m4=s.match(/^\d{4}-(\d{2})$/); if(m4)return MN[parseInt(m4[1])];
+  const m2=s.match(/^(\d{1,2})$/); if(m2)return MN[parseInt(m2[1])]||'—';
+  // Already a month name
+  const idx=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].findIndex(m=>s.toLowerCase().startsWith(m));
+  if(idx>=0)return MN[idx+1];
+  return s;
+}
+function getMo(v){
+  if(!v)return null;
+  const s=String(v).trim();
+  const m4=s.match(/^\d{4}-(\d{2})$/); if(m4)return parseInt(m4[1]);
+  const m2=s.match(/^(\d{1,2})$/); if(m2)return parseInt(m2[1]);
+  // Month name e.g. "Jun"
+  const idx=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].findIndex(m=>s.toLowerCase().startsWith(m));
+  if(idx>=0)return idx+1;
+  return null;
+}
 function fmtD(n){if(!n)return'—';return'$'+Number(n).toLocaleString();}
 function badge(s){if(s==='Active')return`<span class="badge badge-g">🟢 Active</span>`;if(s==='Stalled')return`<span class="badge badge-y">🟡 Stalled</span>`;return`<span class="badge badge-r">🔴 Not Live</span>`;}
 function rowCls(s){if(s==='Active')return'ra';if(s==='Stalled')return'rs';if(s==='Not Live')return'rn';return'';}
 function selOpts(arr,cur){return arr.map(o=>`<option value="${esc(o)}"${o===cur?' selected':''}>${esc(o)}</option>`).join('');}
 function inpMo(val){
-  // Normalise stored value to a 2-digit month number string e.g. "06"
+  const MN2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let curMo = '';
   if(val){
-    const m4=val.match(/^\d{4}-(\d{2})$/);
-    const m2=val.match(/^(\d{1,2})$/);
-    if(m4) curMo=m4[1].padStart(2,'0');
-    else if(m2) curMo=String(parseInt(m2[1])).padStart(2,'0');
+    const s = String(val).trim();
+    // YYYY-MM format e.g. "2026-06"
+    const m4 = s.match(/^\d{4}-(\d{2})$/);
+    if(m4){ curMo = m4[1].padStart(2,'0'); }
+    // Plain number e.g. "6" or "06"
+    else if(s.match(/^\d{1,2}$/)){ curMo = String(parseInt(s)).padStart(2,'0'); }
+    // Month name e.g. "Jun" or "June"
+    else {
+      const idx = MN2.findIndex(m => s.toLowerCase().startsWith(m.toLowerCase()));
+      if(idx >= 0) curMo = String(idx+1).padStart(2,'0');
+    }
   }
-  const MN2=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let opts='<option value="">—</option>';
   MN2.forEach((name,i)=>{
     const v=String(i+1).padStart(2,'0');
@@ -675,7 +699,8 @@ function renderDeals(){
   buildMS('msDealStatus',STATUSES,'All Statuses','renderDeals()');
   buildMS('msDealStage',STAGES,'All Stages','renderDeals()');
   const months=[...new Set(data.deals.map(d=>{const m=getMo(d.closeDate);return m?String(m):null;}).filter(Boolean))].sort((a,b)=>+a-+b);
-  buildMS('msDealMonth',months.map(m=>({val:m,lbl:MN[+m]})).map(x=>x.val),'All Months','renderDeals()');
+  const monthNames=months.map(m=>MN[+m]).filter(Boolean);
+  buildMS('msDealMonth',monthNames,'All Months','renderDeals()');
   const owners=[...new Set(data.deals.map(d=>d.owner).filter(Boolean))];
   const ow=document.getElementById('dealOwner');if(ow){const cv=ow.value;ow.innerHTML='<option value="">All Owners</option>'+owners.map(o=>`<option value="${esc(o)}"${o===cv?' selected':''}>${esc(o)}</option>`).join('');}
   const srch=(document.getElementById('srch')?.value||'').toLowerCase();
@@ -685,7 +710,7 @@ function renderDeals(){
     if(repF&&!repF.includes(d.mlgRep))return false;
     if(statF&&!statF.includes(d.status))return false;
     if(stgF&&!stgF.includes(d.stage))return false;
-    if(moF){const m=getMo(d.closeDate);if(!m||!moF.includes(String(m)))return false;}
+    if(moF){const m=getMo(d.closeDate);if(!m||!moF.includes(MN[m]))return false;}
     if(owF&&d.owner!==owF)return false;
     if(srch&&!`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(srch))return false;
     return true;
@@ -849,7 +874,8 @@ function renderWN(viewWeek){
   buildMS('msWnStage',STAGES,'All Stages','renderWN()');
   buildMS('msWnStatus',STATUSES,'All Statuses','renderWN()');
   const months=[...new Set(data.deals.map(d=>{const m=getMo(d.closeDate);return m?String(m):null;}).filter(Boolean))].sort((a,b)=>+a-+b);
-  buildMS('msWnMonth',months,'All Months','renderWN()');
+  const monthNames2=months.map(m=>MN[+m]).filter(Boolean);
+  buildMS('msWnMonth',monthNames2,'All Months','renderWN()');
   if(!curWeekKey)curWeekKey=getMon(new Date().toISOString().slice(0,10));
   const wEl=document.getElementById('wnDate');if(wEl&&(!wEl.value||wEl.value!==curWeekKey))wEl.value=curWeekKey;
   // History dropdown
@@ -866,7 +892,7 @@ function renderWN(viewWeek){
     if(repF&&!repF.includes(d.mlgRep))return false;
     if(stgF&&!stgF.includes(d.stage))return false;
     if(statF&&!statF.includes(d.status))return false;
-    if(moF){const m=getMo(d.closeDate);if(!m||!moF.includes(String(m)))return false;}
+    if(moF){const m=getMo(d.closeDate);if(!m||!moF.includes(MN[m]))return false;}
     if(progF){const n=notes[d.id]||{};if(n.prog!==progF)return false;}
     if(srch&&!`${d.name} ${d.account} ${d.owner} ${d.mlgRep}`.toLowerCase().includes(srch))return false;
     return true;
@@ -940,7 +966,15 @@ function collectWF(){
     wfSet(mk,wk,rep,f,parseFloat(stripC(el.value))||0);
   });
 }
-function getCloseMonth(v){if(!v)return null;const m4=v.match(/^\d{4}-(\d{2})$/);if(m4)return parseInt(m4[1]);const m2=v.match(/^(\d{1,2})$/);if(m2)return parseInt(m2[1]);return null;}
+function getCloseMonth(v){
+  if(!v)return null;
+  const s=String(v).trim();
+  const m4=s.match(/^\d{4}-(\d{2})$/); if(m4)return parseInt(m4[1]);
+  const m2=s.match(/^(\d{1,2})$/); if(m2)return parseInt(m2[1]);
+  const idx=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].findIndex(m=>s.toLowerCase().startsWith(m));
+  if(idx>=0)return idx+1;
+  return null;
+}
 function repCW(rep,mk){const mo=parseInt(mk.split('-')[1]);return data.deals.filter(d=>{if(d.stage!=='Closed Won')return false;if(rep==='Blank'?d.mlgRep!=='Blank':d.mlgRep!==rep)return false;return getCloseMonth(d.closeDate)===mo;}).reduce((s,d)=>s+(+d.acv||0),0);}
 function repS67(rep,mk){const mo=parseInt(mk.split('-')[1]);return data.deals.filter(d=>{const ok=d.stage==='Stage 6- Finance Hold'||d.stage==='Stage 7- Finance Review';if(!ok)return false;if(rep==='Blank'?d.mlgRep!=='Blank':d.mlgRep!==rep)return false;return getCloseMonth(d.closeDate)===mo;}).reduce((s,d)=>s+(+d.acv||0),0);}
 function repBucket(rep,bkt,mk){const mo=parseInt(mk.split('-')[1]);return data.deals.filter(d=>{if(d.stage==='Closed Won'||d.stage==='Closed Lost')return false;if(d.forecastBucket!==bkt)return false;if(rep==='Blank'?d.mlgRep!=='Blank':d.mlgRep!==rep)return false;return getCloseMonth(d.closeDate)===mo;}).reduce((s,d)=>s+(+d.acv||0),0);}
